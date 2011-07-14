@@ -41,25 +41,19 @@ migrate_database
 # Load support files
 Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].each{|f| require f}
 
-Webrat.configure do |config|
-  config.mode = :rails
-end
-
 RSpec.configure do |config|
   require 'rspec/expectations'
 
   config.include RSpec::Matchers
-  config.include Webrat::Matchers
-  config.include Webrat::HaveTagMatcher
   config.include DatabaseHelpers
   config.include GeneratorHelpers
 
   config.include Warden::Test::Helpers
 
   config.before(:each) do
+    RailsAdmin.setup
     RailsAdmin::Config.excluded_models = [RelTest, FieldTest]
     RailsAdmin::AbstractModel.instance_variable_get("@models").clear
-    RailsAdmin::Config.reset
 
     RailsAdmin::AbstractModel.new("Division").destroy_all!
     RailsAdmin::AbstractModel.new("Draft").destroy_all!
@@ -78,6 +72,7 @@ RSpec.configure do |config|
   end
 
   config.after(:each) do
+    RailsAdmin.test_reset!
     Warden.test_reset!
   end
 end

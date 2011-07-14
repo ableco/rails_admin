@@ -10,8 +10,16 @@ module RailsAdmin
 
           @column_width = 250
 
-          register_instance_option(:partial) do
+          def initialize(parent, name, properties, association)
+            super(parent, name, properties, association)
+          end
+
+          register_instance_option(:edit_partial) do
             :form_polymorphic_association
+          end
+
+          register_instance_option(:show_partial) do
+            :show_polymorphic_association
           end
 
           # Accessor whether association is visible or not. By default
@@ -19,6 +27,14 @@ module RailsAdmin
           # configuration.
           register_instance_option(:visible?) do
             associated_model_config.length > 0
+          end
+
+          register_instance_option(:sortable) do
+            false
+          end
+
+          register_instance_option(:searchable) do
+            false
           end
 
           def associated_collection(type)
