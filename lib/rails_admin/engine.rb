@@ -17,9 +17,9 @@ module RailsAdmin
     
     initializer "add assets to precompile pipeline" do |app|
       # All JS
-      app.config.assets.precompile += Dir.glob(File.expand_path("../../../app/assets/javascripts/rails_admin/**/*.js", __FILE__))
-      # All CSS and CSS images
-      app.config.assets.precompile += Dir.glob(File.expand_path("../../../app/assets/stylesheets/rails_admin/**/*", __FILE__))
+      app.config.assets.precompile += Dir.glob(File.expand_path("../../../app/assets/javascripts/rails_admin/rails_admin.js", __FILE__))
+      # All CSS images
+      app.config.assets.precompile += Dir.glob(File.expand_path("../../../app/assets/stylesheets/rails_admin/rails_admin.css", __FILE__))
       # All images
       app.config.assets.precompile += Dir.glob(File.expand_path("../../../app/assets/images/rails_admin/**/*", __FILE__))
     end
