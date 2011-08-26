@@ -16,6 +16,10 @@ es:
       name: "Histórico"
       page_name: "Histórico de %{name}"
       no_activity: "No hubo actividad"
+    show:
+      show_in_app: "Mostrar en la aplicación"
+      page_name: "Detalles de %{name}"
+      no_file_found: "Archivo no encontrado"
     credentials:
       log_out: "Cerrar sesión"
     list:
@@ -23,6 +27,7 @@ es:
       delete_action: "Eliminar"
       select_action: "Seleccionar"
       export_action: "Exportar vista actual"
+      show_action: "Mostrar"
       export_selected: "Exportar seleccionado"
       delete_selected: "Borrar seleccionado"
       add_new: "Agregar"
@@ -51,6 +56,7 @@ es:
       are_you_sure_you_want_to_delete_the_object: "Estás seguro que quieres borrar %{model_name}"
       confirmation: "Sí, estoy seguro"
       delete_confirmation: "Confirmación de Borrado"
+      bulk_delete: "Los siguientes elementos serán borrados, puede eliminar o dejar algunos elementos huerfanos de sus dependencias relacionadas:"
     export:
       confirmation: "Exportar a %{name}"
       select: "Selecciona los campos a exportar"
@@ -75,7 +81,7 @@ es:
       noaction: "No se realizó ninguna acción"
     actions:
       create: "crear"
-      created: "creado"
+      created: "guardar"
       update: "actualizar"
       updated: "actualizado"
       delete: "borrar"
@@ -87,6 +93,7 @@ es:
       history: "historial"
       edit: "editar"
       export: "exportar"
+      show: "mostrar"
       bulk_destroy: "borrar"
       new: "nuevo"
       model_history: "historial"

@@ -10,16 +10,8 @@ module RailsAdmin
 
           @column_width = 250
 
-          def initialize(parent, name, properties, association)
-            super(parent, name, properties, association)
-          end
-
-          register_instance_option(:edit_partial) do
+          register_instance_option(:partial) do
             :form_polymorphic_association
-          end
-
-          register_instance_option(:show_partial) do
-            :show_polymorphic_association
           end
 
           # Accessor whether association is visible or not. By default
@@ -46,7 +38,7 @@ module RailsAdmin
           end
 
           def associated_model_config
-            association[:parent_model].map{|type| RailsAdmin.config(type) }.select{|config| !config.excluded? }
+            @associated_model_config ||= association[:parent_model].map{|type| RailsAdmin.config(type) }.select{|config| !config.excluded? }
           end
 
           def polymorphic_type_collection
@@ -61,13 +53,13 @@ module RailsAdmin
             end
 
             Hash[*types.collect { |v|
-                  [v[0], bindings[:view].rails_admin_list_path(v[1])]
+                  [v[0], bindings[:view].list_path(v[1])]
                 }.flatten]
           end
 
           # Reader for field's value
           def value
-            bindings[:object].send(name)
+            bindings[:object].send(association[:name])
           end
         end
       end

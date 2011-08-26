@@ -13,8 +13,8 @@ module RailsAdmin
             ""
           end
 
-          register_instance_option(:edit_partial) do
-            "form_filtering_multiselect"
+          register_instance_option(:partial) do
+            :form_filtering_multiselect
           end
 
           register_instance_option(:html_attributes) do
@@ -34,7 +34,7 @@ module RailsAdmin
           end
 
           def method_name
-            "#{super.singularize}_ids" # name_ids
+            "#{super.to_s.singularize}_ids" # name_ids
           end
         end
       end

@@ -8,8 +8,13 @@ module RailsAdmin
           # Register field type for the type loader
           RailsAdmin::Config::Fields::Types::register(self)
 
-          register_instance_option(:edit_partial) do
+          register_instance_option(:partial) do
             :form_filtering_select
+          end
+
+          # Accessor for field's formatted value
+          register_instance_option(:formatted_value) do
+            (o = value) && o.send(associated_model_config.object_label_method)
           end
 
           # Accessor for whether this is field is required.  In this
@@ -23,11 +28,11 @@ module RailsAdmin
           end
 
           def selected_id
-            (object = value).nil? ? nil : object.id
+            value.try :id
           end
 
           def method_name
-            super.singularize + '_id'
+            super.to_s.singularize + '_id'
           end
         end
       end

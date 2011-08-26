@@ -13,10 +13,12 @@ module RailsAdmin
       else
         html = ""
         if paths = @head_javascript_paths
-          html << javascript_include_tag(paths.uniq)
+          paths.uniq.each do |path|
+            html << javascript_include_tag(path)
+          end
         end
         if script = @head_javascript
-          html << javascript_tag(script.join("\n"))
+          html << javascript_tag(script.uniq.join("\n"))
         end
         return html.html_safe
       end
@@ -30,62 +32,40 @@ module RailsAdmin
       else
         html = ""
         if paths = @head_stylesheet_paths
-          html << stylesheet_link_tag(paths.uniq)
+          paths.uniq.each do |path|
+            html << stylesheet_link_tag(path)
+          end
         end
         if style = @head_style
-          html << content_tag(:style, style.join("\n"), :type => "text/css")
+          html << content_tag(:style, style.uniq.join("\n"), :type => "text/css")
         end
         return html.html_safe
       end
     end
 
-    # A Helper to load from a CDN but with fallbacks in case the primary source is unavailable
-    # The best of both worlds - fast clevery cached service from google when available and the
-    # ability to work offline too.
-    #
-    # @example Loading jquery from google
-    #   javascript_fallback "http://ajax.googleapis.com/ajax/libs/jquery/1.4.3/jquery.min.js",
-    #     "/javascripts/jquery-1.4.3.min.js",
-    #     "typeof jQuery == 'undefined'"
-    # @param [String] primary a string to be passed to javascript_include_tag that represents the primary source e.g. A script on googles CDN.
-    # @param [String] fallback a path to the secondary javascript file that is (hopefully) more resilliant than the primary.
-    # @param [String] test a test written in javascript that evaluates to true if it is necessary to load the fallback javascript.
-    # @reurns [String] the resulting html to be inserted into your page.
-    def javascript_fallback(primary, fallback, test)
-      html = javascript_include_tag( primary )
-      html << "\n" << content_tag(:script, :type => "text/javascript") do
-        %Q{
-          if (#{test}) {
-            document.write(unescape("%3Cscript src='#{fallback}' type='text/javascript'%3E%3C/script%3E"));
-          }
-        }.gsub(/^ {8}/, '').html_safe
-      end
-      html+"\n"
-    end
-
     def action_button link, text, icon=nil, options={}
       options.reverse_merge! :class => "button"
       link_to link, options do
-        image = image_tag "/stylesheets/rails_admin/theme/activo/images/icons/#{icon}.png" if icon
+        image = image_tag(image_path("rails_admin/theme/activo/images/icons/#{icon}.png")) if icon
         [image, text].compact.join("\n").html_safe
       end.html_safe
     end
 
     # the icon shown beside every entry in the list view
     def action_icon link, icon, text
-      icon_path = "/stylesheets/rails_admin/theme/activo/images/icons/24/%s.png"
+      icon_path = "rails_admin/theme/activo/images/icons/24/%s.png"
       icon_change = "this.src='#{icon_path}'"
       link_to link do
-        image_tag (icon_path % icon),
-          :alt => text, :title => text,
-          :onmouseout  => (icon_change % icon),
-          :onmouseover => (icon_change % "#{icon}-hover")
+        image_tag image_path(icon_path % icon),
+          :alt => text, :title => text, :class => 'tipsy',
+          :onmouseout  => "this.src='#{image_path(icon_path % icon)}'",
+          :onmouseover => "this.src='#{image_path(icon_path % (icon.to_s + '-hover'))}'"
       end.html_safe
     end
 
     # Used for the icons in the admins very top right.
     def header_icon(image_name, title)
-      image_tag "/stylesheets/rails_admin/theme/activo/images/session/#{image_name}.png", :alt => title, :title => title
+      image_tag image_path("rails_admin/theme/activo/images/session/#{image_name}.png"), :alt => title, :title => title
     end
 
     # Used for the history entries in the sidebar
@@ -137,8 +117,8 @@ module RailsAdmin
     #    Provides the base url to use in the page navigation links.
     #    Defaults to ''
     def paginate(current_page, page_count, options = {})
-      options[:left_cut_label] ||= '&hellip;'
-      options[:right_cut_label] ||= '&hellip;'
+      options[:left_cut_label] ||= '<span>&hellip;</span>'
+      options[:right_cut_label] ||= '<span>&hellip;</span>'
       options[:outer_window] ||= 2
       options[:inner_window] ||= 7
       options[:remote] = true unless options.has_key?(:remote)
@@ -206,17 +186,6 @@ module RailsAdmin
       @authorization_adapter.nil? || @authorization_adapter.authorized?(*args)
     end
 
-    # returns a link to "/" unless there's a problem, which will
-    # probably be caused by root_path not being configured.  see
-    # https://github.com/sferik/rails_admin/issues/345 .
-    def home_link
-      begin
-        link_to(t('home.name'), '/')
-      rescue ActionView::Template::Error
-        t('home.name')
-      end
-    end
-    
     def messages_and_help_for field
       tags = []
       if field.has_errors?
@@ -225,11 +194,11 @@ module RailsAdmin
       tags << content_tag(:p, field.help, :class => "help")
       tags.join("\n").html_safe
     end
-    
+
     def field_wrapper_for form, field, opts={}
       opts = opts.reverse_merge(:label => true, :messages_and_help => true)
-      
-      content_tag(:div, :class => "field #{field.dom_id}") do
+
+      content_tag(:div, :class => "field #{field.dom_id}", :id => field.dom_id + '_field') do
         concat form.label(field.method_name, field.label) if opts[:label]
         yield
         concat messages_and_help_for(field) if opts[:messages_and_help]
@@ -291,20 +260,20 @@ module RailsAdmin
 
         vt = VIEW_TYPES[view]
 
-        # TODO: write tests and enable authorization checking:
-        # if vt.authorization.nil? || authorized?(vt.authorization, abstract_model, object)
+        # TODO: write tests
+        if authorized?(view, abstract_model, object)
           css_classes = []
           css_classes << "first" if view == :dashboard
           css_classes << "active" if active
 
           content_tag(:li, :class => css_classes) do
             path_method = vt.path_method || view
-            link_to I18n.t("admin.breadcrumbs.#{view}").capitalize, self.send("rails_admin_#{path_method}_path")
+            link_to I18n.t("admin.breadcrumbs.#{view}").capitalize, self.send("#{path_method}_path")
           end
-        # end
-
+         end
       end
 
 
   end
 end
+
