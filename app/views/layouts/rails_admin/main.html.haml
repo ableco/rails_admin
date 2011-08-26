@@ -8,7 +8,7 @@
     %meta{:content => "text/html; charset=utf-8", "http-equiv" => "Content-Type"}
     %meta{:content => "NONE,NOARCHIVE", :name => "robots"}
     
-    = stylesheet_link_tag "rails_admin/rails_admin.css"
+    = stylesheet_link_tag "rails_admin/rails_admin.manifest.css"
 
     = head_style
     = csrf_meta_tag
@@ -21,6 +21,6 @@
           #footer
             %p Rails Admin | 2011
         = render :partial => "layouts/rails_admin/sidebar"
-    = javascript_include_tag "rails_admin/rails_admin.js"
+    = javascript_include_tag "rails_admin/rails_admin.manifest.js"
     = head_javascript
 
