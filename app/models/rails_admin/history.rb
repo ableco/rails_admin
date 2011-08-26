@@ -1,6 +1,8 @@
 module RailsAdmin
   class History < ActiveRecord::Base
     set_table_name :rails_admin_histories
+    
+    attr_accessible :message, :item, :table, :username, :month, :year
 
     IGNORED_ATTRS = Set[:id, :created_at, :created_on, :deleted_at, :updated_at, :updated_on, :deleted_on]
 
