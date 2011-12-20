@@ -1,6 +1,5 @@
 require 'rails_admin/engine'
 require 'rails_admin/abstract_model'
-require 'rails_admin/abstract_history'
 require 'rails_admin/config'
 require 'rails_admin/extension'
 require 'rails_admin/extensions/cancan'
@@ -8,37 +7,6 @@ require 'rails_admin/support/csv_converter'
 require 'rails_admin/support/core_extensions'
 
 module RailsAdmin
-  # Copy of initializer blocks for initialization
-  #
-  # @see RailsAdmin.setup
-  @initializers = []
-
-  # Whether or not the initializers have been run
-  #
-  # @see RailsAdmin.reset
-  # @see RailsAdmin.setup
-  @initialized = false
-
-  def self.authenticate_with(&block)
-    ActiveSupport::Deprecation.warn("'#{self.name}.authenticate_with { }' is deprecated, use 'RailsAdmin.config{|c| c.authenticate_with }' instead", caller)
-    self.config {|c| c.authenticate_with(&block) }
-  end
-
-  def self.authorize_with(*args, &block)
-    ActiveSupport::Deprecation.warn("'#{self.name}.authorize_with { }' is deprecated, use 'RailsAdmin.config{|c| c.authorize_with }' instead", caller)
-    self.config {|c| c.authorize_with(*args, &block) }
-  end
-
-  def self.current_user_method(&block)
-    ActiveSupport::Deprecation.warn("'#{self.name}.current_user_method { }' is deprecated, use 'RailsAdmin.config{|c| c.current_user_method }' instead", caller)
-    self.config {|c| c.current_user_method(&block) }
-  end
-
-  def self.configure_with(extension, &block)
-    ActiveSupport::Deprecation.warn("'#{self.name}.configure_with { }' is deprecated, use 'RailsAdmin.config{|c| c.configure_with }' instead", caller)
-    self.config {|c| c.configure_with(extension, &block) }
-  end
-
   # Setup RailsAdmin
   #
   # Given the first argument is a model class, a model class name
@@ -55,9 +23,8 @@ module RailsAdmin
   def self.config(entity = nil, &block)
     if entity
       RailsAdmin::Config.model(entity, &block)
-    elsif block_given?
-      @initializers << block
-      block.call(RailsAdmin::Config) if @initialized
+    elsif block_given? && ENV['SKIP_RAILS_ADMIN_INITIALIZER'] != "true"
+      block.call(RailsAdmin::Config)
     else
       RailsAdmin::Config
     end
@@ -66,18 +33,5 @@ module RailsAdmin
   # Reset RailsAdmin configuration to defaults
   def self.reset
     RailsAdmin::Config.reset
-    @initialized = false
-  end
-
-  # Apply all initializers stored on application startup
-  def self.setup
-    @initializers.each {|block| block.call(RailsAdmin::Config) } unless @initialized
-    @initialized = true
-  end
-
-  # Reset RailsAdmin including initializers
-  def self.test_reset!
-    self.reset
-    @initializers.clear
   end
 end

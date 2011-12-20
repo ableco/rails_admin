@@ -1,6 +1,19 @@
 require 'spec_helper'
 
-describe RailsAdmin do
+describe "RailsAdmin" do
+  describe ".associated_collection_cache_all" do
+    it "should default to true if associated collection count < 100" do
+      RailsAdmin.config(Team).edit.fields.find{|f| f.name == :players}.associated_collection_cache_all.should == true
+    end
+
+    it "should default to false if associated collection count >= 100" do
+      @players = 100.times.map do
+        FactoryGirl.create :player
+      end
+      RailsAdmin.config(Team).edit.fields.find{|f| f.name == :players}.associated_collection_cache_all.should == false
+    end
+  end
+
   describe ".add_extension" do
     it "registers the extension with RailsAdmin" do
       RailsAdmin.add_extension(:example, ExampleModule)
@@ -23,6 +36,36 @@ describe RailsAdmin do
         })
         RailsAdmin::CONFIGURATION_ADAPTERS[:example].should == ExampleModule::ConfigurationAdapter
       end
+    end
+  end
+
+  describe ".attr_accessible_role" do
+    it "sould be :default by default" do
+      RailsAdmin.config.attr_accessible_role.call.should == :default
+    end
+
+    it "sould be configurable with user role for example" do
+      RailsAdmin.config do |config|
+        config.attr_accessible_role do
+          :admin
+        end
+      end
+
+      RailsAdmin.config.attr_accessible_role.call.should == :admin
+    end
+  end
+
+  describe ".main_app_name" do
+
+    it "as a default meaningful dynamic value" do
+      RailsAdmin.config.main_app_name.call.should == ['Dummy App', 'Admin']
+    end
+
+    it "can be configured" do
+      RailsAdmin.config do |config|
+        config.main_app_name = ['static','value']
+      end
+      RailsAdmin.config.main_app_name.should == ['static','value']
     end
   end
 

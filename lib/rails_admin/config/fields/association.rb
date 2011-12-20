@@ -43,21 +43,22 @@ module RailsAdmin
 
         # use the association name as a key, not the association key anymore!
         register_instance_option(:label) do
-          @label ||= abstract_model.model.human_attribute_name association[:name]
+          (@label ||= {})[::I18n.locale] ||= abstract_model.model.human_attribute_name association[:name]
         end
 
-        # Reader for a collection of association's child models in an array of
-        # [label, id] arrays.
-        def associated_collection(authorization_adapter)
-          scope = authorization_adapter && authorization_adapter.query(:list, associated_model_config.abstract_model)
-          associated_model_config.abstract_model.all({}, scope).map do |object|
-            [object.send(associated_model_config.object_label_method), object.id]
+        # scope for possible associable records
+        register_instance_option :associated_collection_scope do
+          # bindings[:object] & bindings[:controller] available
+          associated_collection_scope_limit = (self.associated_collection_cache_all ? nil : 30)
+          Proc.new do |scope|
+            scope.limit(associated_collection_scope_limit)
           end
         end
 
-        # Reader how many records the associated model has
-        def associated_collection_count
-          associated_model_config.abstract_model.count
+        # preload entire associated collection (per associated_collection_scope) on load
+        # Be sure to set limit in associated_collection_scope if set is large
+        register_instance_option :associated_collection_cache_all do
+          @associated_collection_cache_all ||= (associated_model_config.abstract_model.count < 100)
         end
 
         # Reader for the association's child model's configuration
@@ -85,14 +86,14 @@ module RailsAdmin
           bindings[:object].errors[child_key]
         end
 
-        # Reader whether the bound object has validation errors
-        def has_errors?
-          errors.present?
-        end
-
         # Reader whether this is a polymorphic association
         def polymorphic?
           association[:polymorphic]
+        end
+        
+        # Reader for nested attributes
+        def nested_form
+          association[:nested_form]
         end
 
         # Reader for the association's value unformatted

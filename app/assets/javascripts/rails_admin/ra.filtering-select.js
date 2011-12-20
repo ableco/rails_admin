@@ -21,7 +21,9 @@
       },
       minLength: 0,
       searchDelay: 200,
-      source: null
+      remote_source: null,
+      source: null,
+      xhr: false
     },
 
     _create: function() {
@@ -30,14 +32,15 @@
         selected = select.children(":selected"),
         value = selected.val() ? selected.text() : "";
 
-      if (!this.options.source) {
+      if (this.options.xhr) {
+        this.options.source = this.options.remote_source;
+      } else {
         this.options.source = select.children("option").map(function() {
           return { label: $(this).text(), value: this.value };
         }).toArray();
       }
-
-      var input = this.input = $("<input>")
-        .insertAfter(select)
+      var filtering_select = $('<div class="input-append filtering-select" style="float:left"></div>')
+      var input = this.input = $('<input type="search">')
         .val(value)
         .addClass("ra-filtering-select-input")
         .attr('style', select.attr('style'))
@@ -52,6 +55,7 @@
             self._trigger("selected", event, {
               item: option
             });
+            $(self.element.parents('.input')[0]).find('.update').removeClass('disabled');
           },
           change: function(event, ui) {
             if (!ui.item) {
@@ -63,38 +67,30 @@
                   return false;
                 }
               });
-              if (!valid) {
+              if (!valid || $(this).val() == '') {
                 // remove invalid value, as it didn't match anything
-                $(this).val("");
-                select.val("");
+                $(this).val(null);
+                select.html($('<option value="" selected="selected"></option>'));
                 input.data("autocomplete").term = "";
+                $(self.element.parents('.input')[0]).find('.update').addClass('disabled');
                 return false;
               }
+              
             }
           }
         })
-        .addClass("ui-widget ui-widget-content ui-corner-left");
-
+      if(select.attr('placeholder')) 
+        input.attr('placeholder', select.attr('placeholder'))
+        
       input.data("autocomplete")._renderItem = function(ul, item) {
         return $("<li></li>")
           .data("item.autocomplete", item)
-          .append("<a>" + item.label || item.id + "</a>")
+          .append( $( "<a></a>" ).html( item.label || item.id ) )
           .appendTo(ul);
       };
-
-      this.button = $("<button type='button'>&nbsp;</button>")
-        .attr("tabIndex", -1)
-        .attr("title", "Show All Items")
-        .insertAfter(input)
-        .button({
-          icons: {
-            primary: "ui-icon-triangle-1-s"
-          },
-          text: false
-        })
-
-        .removeClass("ui-corner-all")
-        .addClass("ra-filtering-select-button ui-corner-right")
+      
+      // replace with dropdown button once ready in twitter-bootstrap
+      var button = this.button = $('<label class="add-on ui-button ui-widget ui-state-default ui-corner-all ui-button-icon-only" title="Show All Items" role="button"><span class="ui-button-icon-primary ui-icon ui-icon-triangle-1-s"></span><span class="ui-button-text">&nbsp;</span></label>')
         .click(function() {
           // close if already visible
           if (input.autocomplete("widget").is(":visible")) {
@@ -106,6 +102,10 @@
           input.autocomplete("search", "");
           input.focus();
         });
+      
+      filtering_select.append(input).append(button).insertAfter(select);
+      
+        
     },
 
     _getResultSet: function(request, data, xhr) {

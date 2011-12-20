@@ -4,6 +4,35 @@ describe "RailsAdmin Config DSL" do
 
   subject { page }
 
+  describe "configure" do
+    it "should configure without changing the section default list" do
+      RailsAdmin.config Team do
+        edit do
+          configure :name do
+            label "Renamed"
+          end
+        end
+      end
+      fields = RailsAdmin.config(Team).edit.fields
+      fields.find{|f| f.name == :name }.label.should == "Renamed"
+      fields.count.should >= 19 # not 1
+    end
+
+    it "should not change the section list if set" do
+      RailsAdmin.config Team do
+        edit do
+          field :manager
+          configure :name do
+            label "Renamed"
+          end
+        end
+      end
+      fields = RailsAdmin.config(Team).edit.fields
+      fields.first.name.should == :manager
+      fields.count.should == 1 # not 19
+    end
+  end
+
   describe "excluded models" do
     excluded_models = [Division, Draft, Fan]
 
@@ -23,7 +52,7 @@ describe "RailsAdmin Config DSL" do
     end
 
     it "should raise NotFound for the list view" do
-      visit list_path(:model_name => "fan")
+      visit index_path(:model_name => "fan")
       page.driver.status_code.should eql(404)
     end
 
@@ -79,12 +108,28 @@ describe "RailsAdmin Config DSL" do
     end
   end
 
+  describe "css_class" do
+    it "should have a default and be user customizable" do
+      RailsAdmin.config Team do
+        list do
+          field :division do
+            css_class "custom"
+          end
+          field :name
+        end
+      end
+      RailsAdmin.config('Team').list.fields.find{|f| f.name == :division}.css_class.should == "custom" # custom
+      RailsAdmin.config('Team').list.fields.find{|f| f.name == :division}.type_css_class.should == "belongs_to_association_type" # type css class, non-customizable
+      RailsAdmin.config('Team').list.fields.find{|f| f.name == :name}.css_class.should == "name_field" # default
+    end
+  end
+
   describe "compact_show_view" do
 
     it 'should hide empty fields in show view by default' do
       @player = FactoryGirl.create :player
       visit show_path(:model_name => "league", :id => @player.id)
-      should_not have_css("div.player_born_on")
+      should_not have_css("#player_born_on")
     end
 
 
@@ -95,7 +140,33 @@ describe "RailsAdmin Config DSL" do
 
       @player = FactoryGirl.create :player
       visit show_path(:model_name => "player", :id => @player.id)
-      should have_css("div.player_born_on")
+      should have_css(".born_on_field")
+    end
+  end
+
+  describe "searchable and sortable" do
+    it 'should be false if column is virtual, true otherwise' do
+      RailsAdmin.config League do
+        field :virtual_column
+        field :name
+      end
+      @league = FactoryGirl.create :league
+      RailsAdmin.config('League').export.fields.find{ |f| f.name == :virtual_column }.sortable.should == false
+      RailsAdmin.config('League').export.fields.find{ |f| f.name == :virtual_column }.searchable.should == false
+      RailsAdmin.config('League').export.fields.find{ |f| f.name == :name }.sortable.should == true
+      RailsAdmin.config('League').export.fields.find{ |f| f.name == :name }.searchable.should == true
+    end
+  end
+
+  describe "virtual?" do
+    it 'should be true if column has no properties, false otherwise' do
+      RailsAdmin.config League do
+        field :virtual_column
+        field :name
+      end
+      @league = FactoryGirl.create :league
+      RailsAdmin.config('League').export.fields.find{ |f| f.name == :virtual_column }.virtual?.should == true
+      RailsAdmin.config('League').export.fields.find{ |f| f.name == :name }.virtual?.should == false
     end
   end
 

@@ -1,8 +1,48 @@
+# coding: utf-8
+
 require 'spec_helper'
 
 describe "RailsAdmin Config DSL Edit Section" do
 
   subject { page }
+
+  describe "attr_accessible" do
+
+
+    it "should be configurable in the controller scope" do
+
+      RailsAdmin.config do |config|
+        config.excluded_models = []
+        config.attr_accessible_role do
+          _current_user.attr_accessible_role # sould be :custom_role
+        end
+
+        config.model FieldTest do
+          edit do
+            field :string_field
+            field :restricted_field
+            field :protected_field
+          end
+        end
+      end
+
+      visit new_path(:model_name => "field_test")
+      fill_in "field_test[string_field]", :with => "No problem here"
+      fill_in "field_test[restricted_field]", :with => "I'm allowed to do that as :custom_role only"
+      should have_no_selector "field_test[protected_field]"
+      click_button "Save"
+      @field_test = FieldTest.first
+      @field_test.string_field.should == "No problem here"
+      @field_test.restricted_field.should == "I'm allowed to do that as :custom_role only"
+    end
+  end
+
+  describe "css hooks" do
+    it "should be present" do
+      visit new_path(:model_name => "team")
+      should have_selector("#team_division_id_field.field.belongs_to_association_type.division_field")
+    end
+  end
 
   describe "field groupings" do
 
@@ -32,10 +72,12 @@ describe "RailsAdmin Config DSL Edit Section" do
       should have_no_selector("input#team_revenue")
     end
 
-    it "should hide association groupings by the name of the association" do
+    it "should hide association groupings" do
       RailsAdmin.config Team do
         edit do
           group :players do
+            label "Players"
+            field :players
             hide
           end
         end
@@ -70,7 +112,7 @@ describe "RailsAdmin Config DSL Edit Section" do
           end
         end
         visit new_path(:model_name => "team")
-        should have_selector('div.help', :text => "help paragraph to display")
+        should have_selector('legend small', :text => "help paragraph to display")
       end
 
       it "should not show help if not present" do
@@ -82,7 +124,7 @@ describe "RailsAdmin Config DSL Edit Section" do
           end
         end
         visit new_path(:model_name => "team")
-        should_not have_selector('div.help')
+        should_not have_selector('legend small')
       end
 
       it "should be able to display multiple help if there are multiple sections" do
@@ -100,10 +142,72 @@ describe "RailsAdmin Config DSL Edit Section" do
           end
         end
         visit new_path(:model_name => "team")
-        should have_selector("div.help", :text => 'help for default')
-        should have_selector("div.help", :text => 'help for other section')
-        should have_selector("div.help", :count => 2)
+        should have_selector("legend small", :text => 'help for default')
+        should have_selector("legend small", :text => 'help for other section')
+        should have_selector("legend small", :count => 2)
       end
+
+      it "should use the db column size for the maximum length" do
+        visit new_path(:model_name => "team")
+        find("#team_name_field .help-block").should have_content("Length up to 50.")
+      end
+
+# FIXME validates_length_of are leaking in FactoryGirl WTF?
+
+      it "should use the :is setting from the validation" do
+ #        class Team
+ #          validates_length_of :name, :is => 3
+ #        end
+ #        visit new_path(:model_name => "team")
+ #        find("#team_name_field .help-block").should have_content("Length of 3.")
+ #        Team._validators[:name] = []
+      end
+
+      it "should use the :minimum setting from the validation" do
+        class Team
+          validates_length_of :name, :minimum => 1
+        end
+        visit new_path(:model_name => "team")
+        find("#team_name_field .help-block").should have_content("Length of 1-50.")
+        Team._validators[:name] = []
+      end
+
+      it "should use the :maximum setting from the validation" do
+        class Team
+          validates_length_of :name, :maximum => 49
+        end
+        visit new_path(:model_name => "team")
+        find("#team_name_field .help-block").should have_content("Length up to 49.")
+        Team._validators[:name] = []
+      end
+
+      it "should use the minimum of db column size or :maximum setting from the validation" do
+        class Team
+          validates_length_of :name, :maximum => 51
+        end
+        visit new_path(:model_name => "team")
+        find("#team_name_field .help-block").should have_content("Length up to 50.")
+        Team._validators[:name] = []
+      end
+
+      it "should use the :minimum and :maximum from the validation" do
+        class Team
+          validates_length_of :name, :minimum => 1, :maximum => 49
+        end
+        visit new_path(:model_name => "team")
+        find("#team_name_field .help-block").should have_content("Length of 1-49.")
+        Team._validators[:name] = []
+      end
+
+      it "should use the range from the validation" do
+        class Team
+          validates_length_of :name, :in => 1..49
+        end
+        visit new_path(:model_name => "team")
+        find("#team_name_field .help-block").should have_content("Length of 1-49.")
+        Team._validators[:name] = []
+      end
+
     end
 
     it "should have accessor for its fields" do
@@ -200,7 +304,7 @@ describe "RailsAdmin Config DSL Edit Section" do
       should have_selector(".field", :count => 2)
     end
 
-    it "should delegates the label option to the ActiveModel API" do
+    it "should delegates the label option to the ActiveModel API and memoize I18n awarly" do
       RailsAdmin.config Team do
         edit do
           field :manager
@@ -210,6 +314,11 @@ describe "RailsAdmin Config DSL Edit Section" do
       visit new_path(:model_name => "team")
       should have_selector("label", :text => "Team Manager")
       should have_selector("label", :text => "Some Fans")
+      I18n.locale = :fr
+      visit new_path(:model_name => "team")
+      should have_selector("label", :text => "Manager de l'équipe")
+      should have_selector("label", :text => "Quelques fans")
+      I18n.locale = :en
     end
 
     it "should be renameable" do
@@ -366,9 +475,9 @@ describe "RailsAdmin Config DSL Edit Section" do
         end
       end
       visit new_path(:model_name => "team")
-      find(".team_manager p.help").should have_content("Required. 100 characters or fewer. Additional help text for manager field.")
-      find(".team_division_id p.help").should have_content("Required")
-      find(".team_name p.help").should have_content("Optional. 50 characters or fewer.")
+      find("#team_manager_field .help-block").should have_content("Required. Length up to 100. Additional help text for manager field.")
+      find("#team_division_id_field .help-block").should have_content("Required")
+      find("#team_name_field .help-block").should have_content("Optional. Length up to 50.")
     end
 
     it "should have option to override required status" do
@@ -386,9 +495,9 @@ describe "RailsAdmin Config DSL Edit Section" do
         end
       end
       visit new_path(:model_name => "team")
-      find(".team_manager p.help").should have_content("Optional. 100 characters or fewer.")
-      find(".team_division_id p.help").should have_content("Optional")
-      find(".team_name p.help").should have_content("Required. 50 characters or fewer.")
+      find("#team_manager_field .help-block").should have_content("Optional. Length up to 100.")
+      find("#team_division_id_field .help-block").should have_content("Optional")
+      find("#team_name_field .help-block").should have_content("Required. Length up to 50.")
     end
   end
 
@@ -534,6 +643,15 @@ describe "RailsAdmin Config DSL Edit Section" do
         @record.date_field.should eql(::Date.parse(@time.to_s))
       end
 
+      it "should cover a timezone lag even if in UTC+n:00 timezone." do
+        Time.zone = 'Tokyo' # +09:00
+
+        visit new_path(:model_name => "field_test")
+        fill_in "field_test[date_field]", :with => @time.strftime("%B %d, %Y")
+        click_button "Save"
+        @record = RailsAdmin::AbstractModel.new("FieldTest").first
+        @record.date_field.should eql(::Date.parse(@time.to_s))
+      end
 
       it "should have a simple customization option" do
         RailsAdmin.config FieldTest do
@@ -564,6 +682,28 @@ describe "RailsAdmin Config DSL Edit Section" do
         @record = RailsAdmin::AbstractModel.new("FieldTest").first
         @record.date_field.should eql(::Date.parse(@time.to_s))
       end
+    end
+  end
+  
+  describe 'nested form' do 
+
+    it 'should work' do
+      RailsAdmin::Config.excluded_models = [RelTest]
+      visit new_path(:model_name => "field_test")
+      fill_in "field_test_comment_attributes_content", :with => 'nested comment content'
+      click_button "Save"
+      @record = RailsAdmin::AbstractModel.new("FieldTest").first
+      @record.comment.content.should == 'nested comment content'
+      @record.nested_field_tests = [NestedFieldTest.create!(:title => 'title 1'), NestedFieldTest.create!(:title => 'title 2')]
+      visit edit_path(:model_name => "field_test", :id => @record.id)
+      fill_in "field_test_nested_field_tests_attributes_0_title", :with => 'nested field test title 1 edited'
+      page.find('#field_test_comment_attributes__destroy').set('true')
+      page.find('#field_test_nested_field_tests_attributes_1__destroy').set('true')
+      click_button "Save"
+      @record.reload
+      @record.comment.should == nil
+      @record.nested_field_tests.length.should == 1
+      @record.nested_field_tests[0].title.should == 'nested field test title 1 edited'
     end
   end
 
@@ -653,7 +793,7 @@ describe "RailsAdmin Config DSL Edit Section" do
         end
       end
       visit new_path(:model_name => "team")
-      should have_selector("select.enum")
+      should have_selector(".enum_type select")
       should have_content("green")
       Team.send(:remove_method, :color_enum) # Reset
     end
@@ -672,7 +812,7 @@ describe "RailsAdmin Config DSL Edit Section" do
         end
       end
       visit new_path(:model_name => "team")
-      should have_selector("select.enum")
+      should have_selector(".enum_type select")
       should have_content("green")
       Team.send(:remove_method, :color_list) # Reset
     end
@@ -694,7 +834,7 @@ describe "RailsAdmin Config DSL Edit Section" do
         end
       end
       visit new_path(:model_name => "team")
-      should have_selector("select.enum")
+      should have_selector(".enum_type select")
       should have_no_content("green")
       should have_content("yellow")
       Team.send(:remove_method, :color_list) # Reset
@@ -706,162 +846,11 @@ describe "RailsAdmin Config DSL Edit Section" do
     it "should show input with class color" do
       RailsAdmin.config Team do
         edit do
-          field :color do
-            color true
-          end
+          field :color, :color
         end
       end
       visit new_path(:model_name => "team")
-      should have_selector("input.color")
-    end
-  end
-
-  describe "Form builder configuration" do
-
-    it "should allow override of default" do
-      RailsAdmin.config do |config|
-        config.model Player do
-          edit do
-            field :name
-          end
-        end
-        config.model Team do
-          edit do
-            form_builder :form_for_edit
-            field :name
-          end
-        end
-        config.model Fan do
-          create do
-            form_builder :form_for_create
-            field :name
-          end
-          update do
-            form_builder :form_for_update
-            field :name
-          end
-        end
-        config.model League do
-          create do
-            form_builder :form_for_league_create
-            field :name
-          end
-          update do
-            field :name
-          end
-        end
-      end
-
-      RailsAdmin::Config.model(Player).create.form_builder.should be(:form_for)
-      RailsAdmin::Config.model(Player).update.form_builder.should be(:form_for)
-      RailsAdmin::Config.model(Player).edit.form_builder.should be(:form_for)
-
-      RailsAdmin::Config.model(Team).update.form_builder.should be(:form_for_edit)
-      RailsAdmin::Config.model(Team).create.form_builder.should be(:form_for_edit)
-      RailsAdmin::Config.model(Team).edit.form_builder.should be(:form_for_edit)
-
-      RailsAdmin::Config.model(Fan).create.form_builder.should be(:form_for_create)
-      RailsAdmin::Config.model(Fan).update.form_builder.should be(:form_for_update)
-      RailsAdmin::Config.model(Fan).edit.form_builder.should be(:form_for_update) # not sure we care
-
-      RailsAdmin::Config.model(League).create.form_builder.should be(:form_for_league_create)
-      RailsAdmin::Config.model(League).update.form_builder.should be(:form_for)
-      RailsAdmin::Config.model(League).edit.form_builder.should be(:form_for) # not sure we care
-
-      # don't spill over into other views
-      expect {
-        RailsAdmin::Config.model(Team).list.form_builder
-      }.to raise_error(NoMethodError, /undefined method/)
-    end
-
-    it "should be used in the new and edit views" do
-      TF_CREATE_OUTPUT = "MY TEST FORM CREATE TEXT FIELD"
-      TF_UPDATE_OUTPUT = "MY TEST FORM UPDATE TEXT FIELD"
-
-      module MyCreateForm
-        class Builder < ::ActionView::Helpers::FormBuilder
-          def text_field(*args)
-            TF_CREATE_OUTPUT
-          end
-        end
-
-        module ViewHelper
-          def create_form_for(*args, &block)
-            options = args.extract_options!.reverse_merge(:builder => MyCreateForm::Builder)
-            form_for(*(args << options), &block)
-          end
-        end
-      end
-
-      module MyUpdateForm
-        class Builder < ::ActionView::Helpers::FormBuilder
-          def text_field(*args)
-            TF_UPDATE_OUTPUT
-          end
-        end
-
-        module ViewHelper
-          def update_form_for(*args, &block)
-            options = args.extract_options!.reverse_merge(:builder => MyUpdateForm::Builder)
-            form_for(*(args << options), &block)
-          end
-        end
-      end
-
-      class ActionView::Base
-        include MyCreateForm::ViewHelper
-        include MyUpdateForm::ViewHelper
-      end
-
-      RailsAdmin.config do |config|
-        config.model Player do
-          edit do
-            field :name
-          end
-        end
-        config.model Team do
-          edit do
-            form_builder :create_form_for
-            field :name
-          end
-        end
-        config.model League do
-          create do
-            form_builder :create_form_for
-            field :name
-          end
-          update do
-            form_builder :update_form_for
-            field :name
-          end
-        end
-      end
-
-      visit new_path(:model_name => "player")
-      should have_selector("input#player_name")
-      should have_no_content(TF_CREATE_OUTPUT)
-      should have_no_content(TF_UPDATE_OUTPUT)
-      @player = FactoryGirl.create :player
-      visit edit_path(:model_name => "player", :id => @player.id)
-      should have_selector("input#player_name")
-      should have_no_content(TF_CREATE_OUTPUT)
-      should have_no_content(TF_UPDATE_OUTPUT)
-
-      visit new_path(:model_name => "team")
-      should have_content(TF_CREATE_OUTPUT)
-      should have_no_content(TF_UPDATE_OUTPUT)
-      @team = FactoryGirl.create :team
-      visit edit_path(:model_name => "team", :id => @team.id)
-      should have_content(TF_CREATE_OUTPUT)
-      should have_no_content(TF_UPDATE_OUTPUT)
-
-      visit new_path(:model_name => "league")
-      should have_content(TF_CREATE_OUTPUT)
-      should have_no_content(TF_UPDATE_OUTPUT)
-      @league = FactoryGirl.create :league
-      visit edit_path(:model_name => "league", :id => @league.id)
-      should have_no_content(TF_CREATE_OUTPUT)
-      should have_content(TF_UPDATE_OUTPUT)
+      should have_selector(".color_type input")
     end
   end
 end

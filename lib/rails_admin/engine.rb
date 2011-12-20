@@ -1,18 +1,21 @@
-require 'rails_admin'
 require 'rails'
+require 'jquery-rails'
+require 'remotipart'
+require 'bootstrap-sass'
+require 'kaminari'
+require 'rack-pjax'
+require 'nested_form'
+require 'rails_admin'
 
 module RailsAdmin
   class Engine < Rails::Engine
     isolate_namespace RailsAdmin
-
-    ActionDispatch::Callbacks.before do
-      RailsAdmin.setup
+    initializer "RailsAdmin precompile hook" do |app|
+      app.config.assets.precompile += ['rails_admin/rails_admin.js', 'rails_admin/rails_admin.css', 'rails_admin/jquery.colorpicker.js', 'rails_admin/jquery.colorpicker.css']
     end
 
-    initializer "rails admin development mode" do |app|
-      ActionDispatch::Callbacks.after do
-        RailsAdmin.reset if !app.config.cache_classes && RailsAdmin.config.reload_between_requests
-      end
+    initializer "RailsAdmin pjax hook" do |app|
+      app.config.middleware.use Rack::Pjax
     end
   end
 end

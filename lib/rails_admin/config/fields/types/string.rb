@@ -5,39 +5,36 @@ module RailsAdmin
     module Fields
       module Types
         class String < RailsAdmin::Config::Fields::Base
-          # Register field type for the type loader
+
           RailsAdmin::Config::Fields::Types::register(self)
 
-          # Display a colorpicker widget instead of text input.
-          # Todo: refactor to a dedicated field type
-          register_instance_option(:color?) do
-            false
-          end
+          @view_helper = :text_field
+
+          register_instance_option(:html_attributes) do
+            {
+              :maxlength => length,
+              :size => [50, length.to_i].min
+            }
+           end
 
           register_instance_option(:help) do
             text = (required? ? I18n.translate("admin.new.required") : I18n.translate("admin.new.optional")) + '. '
-
-            # Length requirement isn't necessary to display in case a colorpicker is rendered
-            unless color?
-              text += "#{length} "
-              text += length == 1 ? I18n.translate("admin.new.one_char") : I18n.translate("admin.new.many_chars")
-              text += ". "
+            if valid_length.present? && valid_length[:is].present?
+              text += "#{I18n.translate("admin.new.char_length_of").capitalize} #{valid_length[:is]}."
+            else
+              max_length = [length, valid_length[:maximum] || nil].compact.min
+              min_length = [0, valid_length[:minimum] || nil].compact.max
+              if min_length == 0
+                text += "#{I18n.translate("admin.new.char_length_up_to").capitalize} #{max_length}."
+              else
+                text += "#{I18n.translate("admin.new.char_length_of").capitalize} #{min_length}-#{max_length}."
+              end
             end
             text
           end
 
-          register_instance_option(:html_attributes) do
-            {
-              :class => "#{css_class} #{has_errors? ? "errorField" : nil} #{color? ? 'color' : nil}",
-              :maxlength => length,
-              :size => [50, length.to_i].min,
-              :style => "width:#{column_width}px",
-              :value => value,
-            }
-           end
-
           register_instance_option(:partial) do
-            color? ? :form_colorpicker : :form_field
+            :form_field
           end
         end
       end

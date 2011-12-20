@@ -24,12 +24,4 @@ describe "RailsAdmin Basic Delete" do
       page.driver.status_code.should eql(404)
     end
   end
-
-  describe "delete with missing label" do
-    it "should respond successfully" do
-      @division = FactoryGirl.create :division
-      @team = FactoryGirl.create :team, :name => "", :division => @division
-      visit delete_path(:model_name => "division", :id => @division.id)
-    end
-  end
 end

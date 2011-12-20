@@ -9,32 +9,26 @@ module RailsAdmin
           RailsAdmin::Config::Fields::Types::register(self)
 
           # Accessor for field's help text displayed below input field.
-          register_instance_option(:help) do
+          register_instance_option :help do
             ""
           end
 
-          register_instance_option(:partial) do
-            :form_filtering_multiselect
-          end
-
-          register_instance_option(:html_attributes) do
-            {
-              :class => "#{css_class} #{has_errors? ? "errorField" : nil}",
-              :multiple => "multiple",
-            }
+          register_instance_option :partial do
+            nested_form ? :form_nested_many : :form_filtering_multiselect
           end
 
           # orderable associated objects
-          register_instance_option(:orderable) do
+          register_instance_option :orderable do
             false
           end
-
-          def dom_name
-            "#{super}[]" # model_name[name_ids][]
+          
+          def method_name
+            nested_form ? "#{super}_attributes" : "#{super.to_s.singularize}_ids" # name_ids
           end
 
-          def method_name
-            "#{super.to_s.singularize}_ids" # name_ids
+          # Reader for validation errors of the bound object
+          def errors
+            bindings[:object].errors[name]
           end
         end
       end

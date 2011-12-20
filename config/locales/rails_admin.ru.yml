@@ -3,6 +3,11 @@
 ru:
   home:
     name: "Главная"
+  views:
+    pagination:
+      previous: "&laquo; Prev"
+      next: "Next &raquo;"
+      truncate: "…"
   admin:
     dashboard:
       pagename: "Управление сайтом"
@@ -14,18 +19,24 @@ ru:
       add_new: "Добавить"
       show: "Показать"
       ago: "назад"
+      navigation: "Навигация"
     history:
       name: "История"
       page_name: "История для %{name}"
       no_activity: "Без изменений"
+    show:
+      show_in_app: "Показать в приложении"
+      page_name: "Подробно о \"%{name}\""
+      no_file_found: "Файл не найден"
     credentials:
       log_out: "Выйти"
-    list:
+    index:
       edit_action: "Редактировать"
       delete_action: "Удалить"
       select_action: "Выбрать"
       delete_selected: "Удалить выбранные"
       export_action: "Экспортировать данное представление"
+      show_action: "Показать"
       export_selected: "Эспортировать выделенное"
       add_new: "Добавить"
       search: "ПОИСК"
@@ -87,11 +98,12 @@ ru:
       exported: "экспортировано"
     breadcrumbs:
       delete: "удаление"
-      history: "история"
+      for_object: "история"
+      show: "просмотр"
       edit: "редактирование"
       export: "экспорт"
       bulk_destroy: "удаление"
       new: "создание"
-      model_history: "история"
-      list: "список"
+      for_model: "история"
+      index: "список"
       dashboard: "панель"

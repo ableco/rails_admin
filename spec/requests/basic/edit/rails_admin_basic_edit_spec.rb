@@ -20,9 +20,9 @@ describe "RailsAdmin Basic Edit" do
     end
 
     it "should show non-required fields as \"Optional\"" do
-      should have_selector(".player_position .help", :text => "Optional")
-      should have_selector(".player_born_on .help", :text => "Optional")
-      should have_selector(".player_notes .help", :text => "Optional")
+      find("#player_position_field .help-block").should have_content("Optional")
+      find("#player_born_on_field .help-block").should have_content("Optional")
+      find("#player_notes_field .help-block").should have_content("Optional")
     end
   end
 
@@ -47,30 +47,6 @@ describe "RailsAdmin Basic Edit" do
       visit edit_path(:model_name => "league", :id => @league.id)
       should_not have_selector('select#league_team_ids')
       should have_selector('select#league_division_ids') # decoy, fails if naming scheme changes
-    end
-  end
-
-  describe "edit with has-one association" do
-    before(:each) do
-      @player = FactoryGirl.create :player
-      @draft = FactoryGirl.create :draft
-      visit edit_path(:model_name => "player", :id => @player.id)
-    end
-
-    it "should show associated objects" do
-      should have_selector("option", :text => /Draft #\d+/)
-    end
-  end
-
-  describe "edit with has-many association" do
-    before(:each) do
-      @teams = 3.times.map { FactoryGirl.create :team }
-      @player = FactoryGirl.create :player
-      visit edit_path(:model_name => "player", :id => @player.id)
-    end
-
-    it "should show associated objects" do
-      @teams.each { |team| should have_selector("option", :text => /#{team.name}/) }
     end
   end
 
@@ -115,8 +91,19 @@ describe "RailsAdmin Basic Edit" do
     end
 
     it "should display a link to the delete page" do
-      should have_selector "a[href='/admin/balls/#{@ball.id}/delete']"
+      should have_selector "a[href='/admin/ball/#{@ball.id}/delete']"
     end
 
+  end
+  
+  describe "clicking cancel when editing an object" do
+    
+    it "should send back to previous URL" do
+      @ball = FactoryGirl.create :ball
+      visit '/admin/balls?sort=color'
+      click_link 'Edit'
+      click_button 'Cancel'
+      page.current_url.should == 'http://www.example.com/admin/balls?sort=color'
+    end
   end
 end

@@ -36,7 +36,7 @@ describe "RailsAdmin" do
     end
 
     it "should load javascript files in body" do
-      should have_selector('body script[src^="/assets/rails_admin/rails_admin.js"]')
+      should have_selector('head script[src^="/assets/rails_admin/rails_admin.js"]')
     end
   end
 
@@ -47,7 +47,7 @@ describe "RailsAdmin" do
     end
 
     it "should work like belongs to associations in the list view" do
-      visit list_path(:model_name => "comment", :set => "1")
+      visit index_path(:model_name => "comment")
 
       should have_content(@team.name)
     end
@@ -55,15 +55,14 @@ describe "RailsAdmin" do
     it "should be editable" do
       visit edit_path(:model_name => "comment", :id => @comment.id)
 
-      should have_selector("legend", :text => "Commentable")
       should have_selector("select#comment_commentable_type")
       should have_selector("select#comment_commentable_id")
     end
 
-    it "should be hidden in the owning end" do
+    it "should be visible in the owning end" do
       visit edit_path(:model_name => "team", :id => @team.id)
 
-      should have_no_selector("legend", :text => "Comments")
+      should have_selector("select#team_comment_ids")
     end
   end
 

@@ -4,13 +4,12 @@ ENV["RAILS_ENV"] = "test"
 require 'simplecov'
 SimpleCov.start 'rails'
 
+ENV['SKIP_RAILS_ADMIN_INITIALIZER'] = 'true'
 require File.expand_path('../dummy_app/config/environment', __FILE__)
 
 require 'generator_spec/test_case'
-require 'generators/rails_admin/install_migrations_generator'
-require File.dirname(__FILE__) + '/../lib/rails_admin/tasks/install'
-require File.dirname(__FILE__) + '/../lib/rails_admin/tasks/uninstall'
-require 'generators/rails_admin/uninstall_migrations_generator'
+require 'generators/rails_admin/install_generator'
+require 'generators/rails_admin/uninstall_generator'
 require 'rspec/rails'
 require 'factory_girl'
 require 'factories'
@@ -28,7 +27,7 @@ include DatabaseHelpers
 puts 'Setting up database...'
 drop_all_tables
 migrate_database
-
+ENV['SKIP_RAILS_ADMIN_INITIALIZER'] = 'false'
 # Load support files
 Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].each{|f| require f}
 
@@ -61,7 +60,6 @@ RSpec.configure do |config|
   config.include Warden::Test::Helpers
 
   config.before(:each) do
-    RailsAdmin.setup
     RailsAdmin::Config.excluded_models = [RelTest, FieldTest]
     RailsAdmin::AbstractModel.all_models = nil
     RailsAdmin::AbstractModel.all_abstract_models = nil
@@ -72,6 +70,7 @@ RSpec.configure do |config|
     RailsAdmin::AbstractModel.new("Player").destroy_all!
     RailsAdmin::AbstractModel.new("Team").destroy_all!
     RailsAdmin::AbstractModel.new("User").destroy_all!
+    RailsAdmin::AbstractModel.new("FieldTest").destroy_all!
     RailsAdmin::History.destroy_all
 
     user = RailsAdmin::AbstractModel.new("User").create(
@@ -83,7 +82,7 @@ RSpec.configure do |config|
   end
 
   config.after(:each) do
-    RailsAdmin.test_reset!
+    RailsAdmin.reset
     Warden.test_reset!
   end
 end

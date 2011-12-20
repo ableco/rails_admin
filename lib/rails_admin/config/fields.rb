@@ -11,8 +11,6 @@ module RailsAdmin
         if properties.has_key?(:parent_model)
           association = parent.abstract_model.associations.find {|a| a[:name].to_s == properties[:name].to_s}
           field = RailsAdmin::Config::Fields::Types.load("#{association[:polymorphic] ? :polymorphic : properties[:type]}_association").new(parent, properties[:name], association)
-
-          field.read_only(true) if association[:read_only]
           fields << field
 
         # If it's a column
@@ -27,7 +25,6 @@ module RailsAdmin
             field.hide
             field.filterable(false) # filtering is handled on the association itself
           end
-
         end
       end
 
@@ -96,5 +93,5 @@ require 'rails_admin/config/fields/factories/password'
 require 'rails_admin/config/fields/factories/enum'
 require 'rails_admin/config/fields/factories/devise'
 require 'rails_admin/config/fields/factories/paperclip'
+require 'rails_admin/config/fields/factories/dragonfly'
 require 'rails_admin/config/fields/factories/carrierwave'
-

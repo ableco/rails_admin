@@ -3,7 +3,7 @@ require File.expand_path('../boot', __FILE__)
 require 'rails/all'
 require 'devise'
 require 'paperclip'
-
+require 'carrierwave'
 # If you have a Gemfile, require the default gems, the ones in the
 # current environment and also include :assets gems if in development
 # or test environments.
@@ -41,5 +41,7 @@ module DummyApp
 
     # Enable the asset pipeline
     config.assets.enabled = true
+
+    config.autoload_paths += Dir["#{config.root}/app/models/**/"]
   end
 end

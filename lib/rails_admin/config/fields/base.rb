@@ -14,8 +14,7 @@ module RailsAdmin
         attr_accessor :defined, :order
 
         def self.inherited(klass)
-            klass.instance_variable_set("@css_class", klass.name.to_s.demodulize.camelcase(:lower))
-            klass.instance_variable_set("@view_helper", :text_field)
+          klass.instance_variable_set("@view_helper", :text_field)
         end
 
         include RailsAdmin::Config::Hideable
@@ -35,35 +34,27 @@ module RailsAdmin
         end
 
         register_instance_option(:css_class) do
-          self.class.instance_variable_get("@css_class")
+          "#{self.name}_field"
         end
-
-        def column_css_class(*args, &block)
-          if !args[0].nil? || block
-            @css_class = args[0].nil? ? block : args[0]
-          else
-            css_class
-          end
+        
+        def type_css_class
+          "#{type}_type"
+        end
+        
+        def virtual?
+          properties.blank?
         end
 
         register_instance_option(:column_width) do
-          self.class.instance_variable_get("@column_width")
+          nil
         end
-
-        register_instance_option(:read_only) do
-          false
-        end
-
-        register_instance_option(:truncated?) do
-          ActiveSupport::Deprecation.warn("'#{self.name}.truncated?' is deprecated, use '#{self.name}.pretty_value' instead", caller)
-        end
-
+        
         register_instance_option(:sortable) do
-          true
+          !virtual?
         end
 
         register_instance_option(:searchable) do
-          true
+          !virtual?
         end
 
         register_instance_option(:queryable?) do
@@ -91,28 +82,28 @@ module RailsAdmin
           when false
             []
           when :all # valid only for associations
-            self.associated_model_config.list.fields.map { |f| { :column => "#{self.associated_model_config.abstract_model.model.table_name}.#{f.name}", :type => f.type } }
+            table_name = self.associated_model_config.abstract_model.model.table_name
+            self.associated_model_config.list.fields.map { |f| { :column => "#{table_name}.#{f.name}", :type => f.type } }
           else
             [self.searchable].flatten.map do |f|
-              if f.is_a?(String) && f.include?('.')                            #  "table_name.attribute"
-                @table_name, column_name = f.split '.'
-                f = column_name.to_sym
+              if f.is_a?(String) && f.include?('.')                            #  table_name.column
+                table_name, column = f.split '.'
+                type = nil
+              elsif f.is_a?(Hash)                                              #  <Model|table_name> => <attribute|column>
+                am = AbstractModel.new(f.keys.first.to_s.classify)
+                table_name = am && am.model.table_name || f.keys.first
+                column = f.values.first
+                property = am && am.properties.find{ |p| p[:name] == f.values.first.to_sym }
+                type = property && property[:type]
+              else                                                             #  <attribute|column>
+                am = (self.association? ? self.associated_model_config.abstract_model : self.abstract_model)
+                table_name = am.model.table_name
+                column = f
+                property = am.properties.find{ |p| p[:name] == f.to_sym }
+                type = property && property[:type]
               end
 
-              field_name = f.is_a?(Hash) ? f.values.first : f
-
-              abstract_model = if f.is_a?(Hash) && (f.keys.first.is_a?(Class) || f.keys.first.is_a?(String)) #  { Model => :attribute } || { "Model" => :attribute }
-                AbstractModel.new(f.keys.first)
-              elsif f.is_a?(Hash)                                            #  { :table_name => :attribute }
-                @table_name = f.keys.first.to_s
-                (self.association? ? self.associated_model_config.abstract_model : self.abstract_model)
-              else                                                           #  :attribute
-                (self.association? ? self.associated_model_config.abstract_model : self.abstract_model)
-              end
-
-              property = abstract_model.properties.find{ |p| p[:name] == field_name }
-              raise ":#{field_name} attribute not found/not accessible on table :#{abstract_model.model.table_name}. \nPlease check '#{self.abstract_model.pretty_name}' configuration for :#{self.name} attribute." unless property
-              { :column => "#{@table_name || abstract_model.model.table_name}.#{property[:name]}", :type => property[:type] }
+              { :column => "#{table_name}.#{column}", :type => (type || :string) }
             end
           end
         end
@@ -123,9 +114,9 @@ module RailsAdmin
 
         # output for pretty printing (show, list)
         register_instance_option(:pretty_value) do
-          formatted_value
+          formatted_value.presence || ' - '
         end
-        
+
         # output for printing in export view (developers beware: no bindings[:view] and no data!)
         register_instance_option(:export_value) do
           pretty_value
@@ -134,54 +125,45 @@ module RailsAdmin
 
         # Accessor for field's help text displayed below input field.
         register_instance_option(:help) do
-          @help ||= (required? ? I18n.translate("admin.new.required") : I18n.translate("admin.new.optional")) + '. '
+          (@help ||= {})[::I18n.locale] ||= (required? ? I18n.translate("admin.new.required") : I18n.translate("admin.new.optional")) + '. '
         end
 
         register_instance_option(:html_attributes) do
-          {
-            :class => "#{css_class} #{has_errors? ? "errorField" : nil}",
-            :value => value
-          }.merge(column_width.present? ? { :style => "width:#{column_width}px" } : {})
+          {}
         end
 
         # Accessor for field's label.
         #
         # @see RailsAdmin::AbstractModel.properties
         register_instance_option(:label) do
-          @label ||= abstract_model.model.human_attribute_name name
+          (@label ||= {})[::I18n.locale] ||= abstract_model.model.human_attribute_name name
         end
 
-        # Accessor for field's maximum length.
+        # Accessor for field's maximum length per database.
         #
         # @see RailsAdmin::AbstractModel.properties
         register_instance_option(:length) do
           @length ||= properties && properties[:length]
         end
 
+        # Accessor for field's length restrictions per validations
+        #
+        register_instance_option(:valid_length) do
+          @valid_length ||= abstract_model.model.validators_on(name).find{|v|
+            v.is_a?(ActiveModel::Validations::LengthValidator)}.try{|v| v.options} || {}
+        end
+
         register_instance_option(:partial) do
           :form_field
         end
 
-        register_deprecated_instance_option(:show_partial, :partial) # deprecated on 2011-07-15
-        register_deprecated_instance_option(:edit_partial, :partial) # deprecated on 2011-07-15
-        register_deprecated_instance_option(:create_partial, :partial) # deprecated on 2011-07-15
-        register_deprecated_instance_option(:update_partial, :partial) # deprecated on 2011-07-15
-
-        register_instance_option(:render) do
-          bindings[:view].render :partial => partial.to_s, :locals => {:field => self, :form => bindings[:form] }
-        end
-
-        # Accessor for whether this is field is mandatory.  This is
-        # based on two factors: whether the field is nullable at the
-        # database level, and whether it has an ActiveRecord validation
-        # that requires its presence.
+        # Accessor for whether this is field is mandatory.
         #
         # @see RailsAdmin::AbstractModel.properties
         register_instance_option(:required?) do
-          @required ||= begin
-            validators = abstract_model.model.validators_on(@name)
-            required_by_validator = validators.find{|v| (v.class == ActiveModel::Validations::PresenceValidator) || (v.class == ActiveModel::Validations::NumericalityValidator && !v.options[:allow_nil])} && true || false
-            properties && !properties[:nullable?] || required_by_validator
+          @required ||= !!abstract_model.model.validators_on(name).find do |v|
+            v.is_a?(ActiveModel::Validations::PresenceValidator) && !v.options[:allow_nil] ||
+            v.is_a?(ActiveModel::Validations::NumericalityValidator) && !v.options[:allow_nil]
           end
         end
 
@@ -195,6 +177,23 @@ module RailsAdmin
         register_instance_option(:view_helper) do
           @view_helper ||= self.class.instance_variable_get("@view_helper")
         end
+        
+        register_instance_option :read_only do
+          not editable
+        end
+        
+        def editable
+          return false if @properties && @properties[:read_only]
+          role = bindings[:view].controller.send(:_attr_accessible_role)
+          klass = bindings[:object].class
+          whitelist = klass.accessible_attributes(role).map(&:to_s)
+          blacklist = klass.protected_attributes(role).map(&:to_s)
+          !self.method_name.to_s.in?(blacklist) && (whitelist.any? ? self.method_name.to_s.in?(whitelist) : true)
+        end
+        
+        def render
+          bindings[:view].render :partial => partial.to_s, :locals => {:field => self, :form => bindings[:form] }
+        end
 
         # Is this an association
         def association?
@@ -204,11 +203,6 @@ module RailsAdmin
         # Reader for validation errors of the bound object
         def errors
           bindings[:object].errors[name]
-        end
-
-        # Reader whether the bound object has validation errors
-        def has_errors?
-          !(bindings[:object].errors[name].nil? || bindings[:object].errors[name].empty?)
         end
 
         # Reader whether field is optional.
@@ -245,19 +239,14 @@ module RailsAdmin
         def value
           bindings[:object].safe_send(name)
         end
-
-        # Reader for field's name
-        def dom_name
-          @dom_name ||= "#{bindings[:form].object_name}#{(index = bindings[:form].options[:index]) && "[#{index}]"}[#{method_name}]"
+        
+        # Reader for nested attributes
+        def nested_form
+          false
         end
-
-        # Reader for field's id
-        def dom_id
-          @dom_id ||= [
-            bindings[:form].object_name,
-            bindings[:form].options[:index],
-            method_name
-          ].reject(&:blank?).join('_')
+        
+        def inverse_of
+          nil
         end
 
         def method_name

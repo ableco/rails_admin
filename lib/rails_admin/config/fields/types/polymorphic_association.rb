@@ -8,8 +8,6 @@ module RailsAdmin
           # Register field type for the type loader
           RailsAdmin::Config::Fields::Types::register(self)
 
-          @column_width = 250
-
           register_instance_option(:partial) do
             :form_polymorphic_association
           end
@@ -27,6 +25,16 @@ module RailsAdmin
 
           register_instance_option(:searchable) do
             false
+          end
+
+          # TODO not supported yet
+          register_instance_option :associated_collection_cache_all do
+            false
+          end
+
+          # TODO not supported yet
+          register_instance_option :associated_collection_scope do
+            nil
           end
 
           def associated_collection(type)
@@ -53,7 +61,7 @@ module RailsAdmin
             end
 
             Hash[*types.collect { |v|
-                  [v[0], bindings[:view].list_path(v[1])]
+                  [v[0], bindings[:view].index_path(v[1])]
                 }.flatten]
           end
 

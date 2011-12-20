@@ -26,7 +26,7 @@ module RailsAdmin
         model_config = RailsAdmin.config(abstract_model)
         methods = [(values[:only] || []) + (values[:methods] || [])].flatten.compact
         fields = model_config.export.fields.select{|f| methods.include? f.name }
-      
+
         @associations[key] = {
           :association => association,
           :model => model,
@@ -69,15 +69,17 @@ module RailsAdmin
             end
           end.flatten
         end
+        @objects.each do |o|
 
-        @objects.each do |object|
+
           csv << @fields.map do |field|
-            output(field.with(:object => object).export_value)
+            output(field.with(:object => o).export_value)
           end +
           @associations.map do |association_name, option_hash|
-            associated_objects = [object.send(association_name)].flatten.compact
+
+            associated_objects = [o.send(association_name)].flatten.compact
             option_hash[:fields].map do |field|
-              output(associated_objects.map{ |object| field.with(:object => object).export_value.presence || @empty }.join(','))
+              output(associated_objects.map{ |ao| field.with(:object => ao).export_value.presence || @empty }.join(','))
             end
           end.flatten
         end

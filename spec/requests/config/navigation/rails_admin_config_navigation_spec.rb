@@ -8,8 +8,8 @@ describe "RailsAdmin Config DSL Navigation Section" do
 
     it "should be alphabetical by default" do
       visit dashboard_path
-      ["Balls", "Basic pages", "Comments", "Divisions", "Drafts", "Fans", "Leagues", "Players", "Teams", "Users"].each_with_index do |content, i|
-        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]/a").should have_content(content)
+      ["Balls", "Basic pages", "Comments", "Divisions", "Drafts", "Fans", "Hardballs", "Leagues", "Nested field tests", "Players", "Teams", "Unscoped pages", "Users"].each_with_index do |content, i|
+        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]").should have_content(content)
       end
     end
 
@@ -20,8 +20,8 @@ describe "RailsAdmin Config DSL Navigation Section" do
         end
       end
       visit dashboard_path
-      ["Teams", "Balls", "Basic pages", "Comments", "Divisions", "Drafts", "Fans", "Leagues", "Players", "Users"].each_with_index do |content, i|
-        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]/a").should have_content(content)
+      ["Teams", "Balls", "Basic pages", "Comments", "Divisions", "Drafts", "Fans", "Hardballs", "Leagues", "Nested field tests", "Players", "Unscoped pages", "Users"].each_with_index do |content, i|
+        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]").should have_content(content)
       end
     end
 
@@ -32,11 +32,11 @@ describe "RailsAdmin Config DSL Navigation Section" do
         end
       end
       visit dashboard_path
-      ["Balls", "Basic pages", "Divisions", "Drafts", "Fans", "Leagues", "Players", "Teams", "Users"].each_with_index do |content, i|
-        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]/a").should have_content(content)
+      ["Balls", "Basic pages", "Divisions", "Drafts", "Fans", "Hardballs", "Leagues", "Nested field tests", "Players", "Teams", "Unscoped pages", "Users"].each_with_index do |content, i|
+        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]").should have_content(content)
       end
       ["Basic pages", "Comments"].each_with_index do |content, i|
-        find(:xpath, "//ul[@id='nav']/li[contains(@class, 'more')]/ul/li[#{i + 1}]/a").should have_content(content)
+        find(:xpath, "//ul[@id='nav']/li[contains(@class, 'more')]/ul/li[#{i + 1}]").should have_content(content)
       end
     end
 
@@ -50,11 +50,11 @@ describe "RailsAdmin Config DSL Navigation Section" do
         end
       end
       visit dashboard_path
-      ["Balls", "CMS related", "Divisions", "Drafts", "Fans", "Leagues", "Players", "Teams", "Users"].each_with_index do |content, i|
-        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]/a").should have_content(content)
+      ["Balls", "CMS related", "Divisions", "Drafts", "Fans", "Hardballs", "Leagues", "Nested field tests", "Players", "Teams", "Unscoped pages", "Users"].each_with_index do |content, i|
+        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]").should have_content(content)
       end
       ["Basic pages", "Comments"].each_with_index do |content, i|
-        find(:xpath, "//ul[@id='nav']/li[contains(@class, 'more')]/ul/li[#{i + 1}]/a").should have_content(content)
+        find(:xpath, "//ul[@id='nav']/li[contains(@class, 'more')]/ul/li[#{i + 1}]").should have_content(content)
       end
     end
 
@@ -69,8 +69,8 @@ describe "RailsAdmin Config DSL Navigation Section" do
         end
       end
       visit dashboard_path
-      ["Balls", "Divisions", "Drafts", "Fans", "Leagues", "Players", "Teams", "Users", "CMS related"].each_with_index do |content, i|
-        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]/a").should have_content(content)
+      ["Balls", "Divisions", "Drafts", "Fans", "Hardballs", "Leagues", "Nested field tests", "Players", "Teams", "Unscoped pages", "Users", "CMS related"].each_with_index do |content, i|
+        find(:xpath, "//ul[@id='nav']/li[#{i + 2}]").should have_content(content)
       end
     end
   end

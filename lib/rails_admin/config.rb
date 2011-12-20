@@ -1,11 +1,9 @@
 require 'rails_admin/config/model'
 require 'rails_admin/config/sections/list'
-require 'rails_admin/config/sections/navigation'
 require 'active_support/core_ext/class/attribute_accessors'
 
 module RailsAdmin
   module Config
-    class AuthenticationNotConfigured < StandardError; end
     # RailsAdmin is setup to try and authenticate with warden
     # If warden is found, then it will try to authenticate
     #
@@ -21,33 +19,21 @@ module RailsAdmin
     # @see RailsAdmin::Config.authenticate_with
     # @see RailsAdmin::Config.authorize_with
     DEFAULT_AUTHENTICATION = Proc.new do
-      warden = request.env['warden']
-      if warden
-        warden.authenticate!
-      else
-        if %w(production beta uat staging).include?(Rails.env)
-          raise AuthenticationNotConfigured, "See RailsAdmin::Config.authenticate_with or setup Devise / Warden"
-        end
-      end
+      request.env['warden'].try(:authenticate!)
     end
+
+    DEFAULT_ATTR_ACCESSIBLE_ROLE = Proc.new { :default }
 
     DEFAULT_AUTHORIZE = Proc.new {}
 
     DEFAULT_CURRENT_USER = Proc.new do
-      warden = request.env["warden"]
-      if warden
-        warden.user
-      elsif respond_to?(:current_user)
-        current_user
-      else
-        raise "See RailsAdmin::Config.current_user_method or setup Devise / Warden"
-      end
+      request.env["warden"].try(:user) || respond_to?(:current_user) && current_user
     end
 
-    class << self
 
-      # in development mode, setting this to true will make rails_admin reload the whole configuration at each request
-      attr_accessor :reload_between_requests
+    class << self
+      # Application title, can be an array of two elements
+      attr_accessor :main_app_name
 
       # Configuration option to specify which models you want to exclude.
       attr_accessor :excluded_models
@@ -61,9 +47,6 @@ module RailsAdmin
 
       # Fields to be hidden in show, create and update views
       attr_accessor :default_hidden_fields
-
-      # Fields to be hidden in export views
-      attr_accessor :default_hidden_fields_for_export
 
       # Default items per page value used if a model level option has not
       # been configured
@@ -113,6 +96,12 @@ module RailsAdmin
       def authenticate_with(&blk)
         @authenticate = blk if blk
         @authenticate || DEFAULT_AUTHENTICATION
+      end
+
+
+      def attr_accessible_role(&blk)
+        @attr_accessible_role = blk if blk
+        @attr_accessible_role || DEFAULT_ATTR_ACCESSIBLE_ROLE
       end
 
       # Setup authorization to be run as a before filter
@@ -193,15 +182,6 @@ module RailsAdmin
         end
       end
 
-      # Shortcut to access the list section's class configuration
-      # within a config DSL block
-      #
-      # @see RailsAdmin::Config::Sections::List
-      def list
-        ActiveSupport::Deprecation.warn("RailsAdmin::Config.list is deprecated", caller)
-        RailsAdmin::Config::Sections::List
-      end
-
       # Loads a model configuration instance from the registry or registers
       # a new one if one is yet to be added.
       #
@@ -241,32 +221,22 @@ module RailsAdmin
         RailsAdmin::AbstractModel.all.map{|m| model(m, &block)}
       end
 
-      # Shortcut to access the navigation section's class configuration
-      # within a config DSL block
-      #
-      # @see RailsAdmin::Config::Sections::Navigation
-      def navigation
-        ActiveSupport::Deprecation.warn("RailsAdmin::Config.navigation is deprecated", caller)
-        RailsAdmin::Config::Sections::Navigation
-      end
-
       # Reset all configurations to defaults.
       #
       # @see RailsAdmin::Config.registry
       def reset
-        @reload_between_requests = true
         @compact_show_view = true
         @authenticate = nil
         @authorize = nil
         @current_user = nil
         @default_hidden_fields = [:id, :created_at, :created_on, :deleted_at, :updated_at, :updated_on, :deleted_on]
-        @default_hidden_fields_for_export = []
         @default_items_per_page = 20
         @default_search_operator = 'default'
         @excluded_models = []
         @included_models = []
         @total_columns_width = 697
         @label_methods = [:name, :title]
+        @main_app_name = Proc.new { [Rails.application.engine_name.titleize.chomp(' Application'), 'Admin'] }
         @registry = {}
       end
 
