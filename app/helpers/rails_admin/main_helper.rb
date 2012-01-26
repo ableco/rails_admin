@@ -6,7 +6,7 @@ module RailsAdmin
       options = args.extract_options!.reverse_merge(:builder => RailsAdmin::FormBuilder)
       form_for(*(args << options), &block) << after_nested_form_callbacks
     end
-    
+            
     def get_indicator(percent)
       return "" if percent < 0          # none
       return "notice" if percent < 34   # < 1/100 of max

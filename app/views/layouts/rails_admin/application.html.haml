@@ -20,7 +20,7 @@
     .container-fluid
       .sidebar
         .well
-          %h3= t "admin.dashboard.navigation"
+          %h3= t "admin.misc.navigation"
           = render :partial => 'layouts/rails_admin/navigation'
       .content
         .page-header
@@ -29,12 +29,10 @@
           .alert-message.fade.in{:class => key}
             %a.close{:href => '#'}×
             %p= value
-        = breadcrumbs_for params[:action].to_sym, @abstract_model, @object
-        - if @abstract_model
-          - if @object && !@object.new_record?
-            %ul.tabs= render :partial => 'rails_admin/main/object_links', :locals => { :add_active_class => true, :model_name => params[:model_name], :object => @object }
-          - else
-            %ul.tabs= render :partial => 'rails_admin/main/models_links', :locals => { :abstract_model => @abstract_model }
+        = breadcrumb
+        %ul.tabs
+          = menu_for((@abstract_model ? (@object.try(:id) ? :member : :collection) : :root), @abstract_model, @object)
+          = content_for :contextual_tabs
         %span.row
         = yield
         %footer

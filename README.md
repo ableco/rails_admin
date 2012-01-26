@@ -18,17 +18,74 @@ Hoeven][plukevdh], and [Rein Henrichs][reinh].
 [plukevdh]: https://github.com/plukevdh
 [reinh]: https://github.com/reinh
 
+## <a name="announcements"></a>Announcements
+
+* Actions
+
+Custom actions are finally there. Default should stay put. To customize them, please have a look at: 
+
+
+[Wiki: actions](https://github.com/sferik/rails_admin/wiki/Actions)<br>
+[Documented source code: Base Action class](https://github.com/sferik/rails_admin/blob/master/lib/rails_admin/config/actions/base.rb)
+
+
+* Translations
+
+Translations have been totally revamped (for custom actions)
+
+Translation keys for actions now look like:
+
+```yaml
+
+en:
+  admin:
+    actions:
+      <action_name>:
+        title: "..."
+        menu: "..."
+        breadcrumb: "..."
+
+```
+
+Other keys may have changed too.
+
+Old outdated translations have been removed, you must now fetch them from the wiki.
+
+See [Wiki](https://github.com/sferik/rails_admin/wiki/Translations) for more informations.
+
+Thanks a lot to all the translators sharing their work, sorry for the added worked (it was really needed).
+
+* History
+
+If you wish to continue using the old history feature, please add this to your initializer:
+
+```ruby
+config.audit_with :history, User
+```
+
+Alternatively, [PaperTrail](https://github.com/airblade/paper_trail) is now officially compatible. Install it, add `has_paper_trail` to the models you wish to track, and add this instead to your initializer:
+
+```ruby
+config.audit_with :paper_trail, User
+```
+
+Change `User` with the class you use with Devise.
+
+By default, there won't be any history shown.
+
 ## <a name="features"></a>Features
 
 * Display database tables
 * Create new data
 * Easily update data
 * Safely delete data
+* Custom actions
 * Automatic form validation
 * Search and filtering
 * Export data to CSV/JSON/XML
 * Authentication (via [Devise](https://github.com/plataformatec/devise))
-* User action history
+* Authorization (via [Cancan](https://github.com/ryanb/cancan))
+* User action history (internally or via [PaperTrail](https://github.com/airblade/paper_trail))
 * Supported ORMs
   * ActiveRecord
 
@@ -58,9 +115,15 @@ don't already have it installed. [Devise](https://github.com/plataformatec/devis
 recommended to protect your data from anonymous users.
 It will modify your `config/routes.rb`, adding:
 
-    mount RailsAdmin::Engine => '/admin', :as => 'rails_admin'
+```ruby
+mount RailsAdmin::Engine => '/admin', :as => 'rails_admin' # Feel free to change '/admin' to any namespace you need.
+```
 
-And add an intializer that will help you getting started. (head for config/initializers/rails_admin.rb)
+It will add an intializer that will help you getting started. (head for config/initializers/rails_admin.rb)
+
+Optionaly, you may want to set up [Cancan](https://github.com/ryanb/cancan), [PaperTrail](https://github.com/airblade/paper_trail), [CKeditor](https://github.com/galetahub/ckeditor)
+
+More on that in the [Wiki](https://github.com/sferik/rails_admin/wiki)
 
 ## <a name="usage"></a>Usage
 Start the server:
@@ -75,6 +138,8 @@ You should now be able to administer your site at
 All configuration documentation has moved to the wiki: https://github.com/sferik/rails_admin/wiki
 
 ## <a name="support"></a>Support
+Please see [list of know issues](https://github.com/sferik/rails_admin/wiki/Known-issues) first.
+
 If you have a question, you can ask the [official RailsAdmin mailing
 list](http://groups.google.com/group/rails_admin) or ping sferik on IRC in
 [#railsadmin on

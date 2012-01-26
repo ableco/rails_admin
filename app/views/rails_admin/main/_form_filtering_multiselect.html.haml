@@ -25,11 +25,14 @@
   end
 
 %input{:name => form.dom_name(field), :type => "hidden", :value => ""}
+
+- selected_ids = (hdv = field.html_default_value).nil? ? selected_ids : hdv
 = form.select field.method_name, collection, { :selected => selected_ids, :object => form.object }, field.html_attributes.merge({:'data-edit-url' => edit_url, :multiple => true})
 - if authorized? :new, config.abstract_model
   - path_hash = { :model_name => config.abstract_model.to_param, :modal => true }
   - path_hash.merge!({ :associations => { field.inverse_of => (form.object.id || 'new') } }) if field.inverse_of
-  = link_to t('admin.actions.create').capitalize + ' ' + config.abstract_model.pretty_name.downcase, '#', :data => { :link => new_path(path_hash) }, :class => "create btn", :style => 'margin-left:10px'
+  = link_to wording_for(:link, :new, config.abstract_model), '#', :data => { :link => new_path(path_hash) }, :class => "create btn", :style => 'margin-left:10px'  
+  
 = form.javascript_for(field) do
   :plain
     $("#{form.jquery_namespace(field)} select").filteringMultiselect({
@@ -41,12 +44,12 @@
       sortable: #{field.orderable ? 'true' : 'false'},
       cacheAll: #{field.associated_collection_cache_all ? 'true' : 'false'},
       regional: {
-        chooseAll: "#{t("admin.new.chose_all")}",
-        chosen: "#{t("admin.new.chosen", :name => config.label_plural)}",
-        clearAll:  "#{t("admin.new.clear_all")}",
-        search: "#{t("admin.index.search")}",
-        up: "#{t("admin.new.up")}",
-        down: "#{t("admin.new.down")}"
+        chooseAll: "#{t("admin.misc.chose_all")}",
+        chosen: "#{t("admin.misc.chosen", :name => config.label_plural)}",
+        clearAll:  "#{t("admin.misc.clear_all")}",
+        search: "#{t("admin.misc.search")}",
+        up: "#{t("admin.misc.up")}",
+        down: "#{t("admin.misc.down")}"
       }
     });
     if($("#modal").length) { // hide link if we already are inside a dialog (endless issues on nested dialogs with JS)

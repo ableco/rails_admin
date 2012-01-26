@@ -1,17 +1,17 @@
 require 'active_support/core_ext/string/inflections'
 require 'rails_admin/config/base'
 require 'rails_admin/config/hideable'
-require 'rails_admin/config/has_groups'
 require 'rails_admin/config/fields'
-require 'rails_admin/config/fields/groupable'
 require 'rails_admin/config/fields/association'
+require 'rails_admin/config/fields/groupable'
+
 
 module RailsAdmin
   module Config
     module Fields
       class Base < RailsAdmin::Config::Base
         attr_reader :name, :properties
-        attr_accessor :defined, :order
+        attr_accessor :defined, :order, :section
 
         def self.inherited(klass)
           klass.instance_variable_set("@view_helper", :text_field)
@@ -21,16 +21,14 @@ module RailsAdmin
 
         def initialize(parent, name, properties)
           super(parent)
-
+          
           @defined = false
           @name = name
           @order = 0
           @properties = properties
-
-          # If parent is able to group fields the field should be aware of it
-          if parent.kind_of?(RailsAdmin::Config::HasGroups)
-            extend RailsAdmin::Config::Fields::Groupable
-          end
+          @section = parent
+          
+          extend RailsAdmin::Config::Fields::Groupable
         end
 
         register_instance_option(:css_class) do
@@ -90,7 +88,7 @@ module RailsAdmin
                 table_name, column = f.split '.'
                 type = nil
               elsif f.is_a?(Hash)                                              #  <Model|table_name> => <attribute|column>
-                am = AbstractModel.new(f.keys.first.to_s.classify)
+                am = f.keys.first.is_a?(Class) && AbstractModel.new(f.keys.first)
                 table_name = am && am.model.table_name || f.keys.first
                 column = f.values.first
                 property = am && am.properties.find{ |p| p[:name] == f.values.first.to_sym }
@@ -125,11 +123,15 @@ module RailsAdmin
 
         # Accessor for field's help text displayed below input field.
         register_instance_option(:help) do
-          (@help ||= {})[::I18n.locale] ||= (required? ? I18n.translate("admin.new.required") : I18n.translate("admin.new.optional")) + '. '
+          (@help ||= {})[::I18n.locale] ||= (required? ? I18n.translate("admin.form.required") : I18n.translate("admin.form.optional")) + '. '
         end
 
         register_instance_option(:html_attributes) do
           {}
+        end
+        
+        register_instance_option :default_value do
+          nil
         end
 
         # Accessor for field's label.
@@ -180,6 +182,16 @@ module RailsAdmin
         
         register_instance_option :read_only do
           not editable
+        end
+        
+        register_instance_option :visible? do
+          returned = true
+          (RailsAdmin.config.default_hidden_fields || {}).each do |section, fields|
+            if self.section.is_a?("RailsAdmin::Config::Sections::#{section.to_s.camelize}".constantize)
+              returned = false if fields.include?(self.name)
+            end
+          end
+          returned
         end
         
         def editable
@@ -241,7 +253,7 @@ module RailsAdmin
         end
         
         # Reader for nested attributes
-        def nested_form
+        register_instance_option :nested_form do
           false
         end
         
@@ -251,6 +263,10 @@ module RailsAdmin
 
         def method_name
           name
+        end
+        
+        def html_default_value
+          bindings[:object].new_record? && self.value.nil? && !self.default_value.nil? ? self.default_value : nil
         end
       end
     end

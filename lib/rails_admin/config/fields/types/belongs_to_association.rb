@@ -13,20 +13,12 @@ module RailsAdmin
             (o = value) && o.send(associated_model_config.object_label_method)
           end
 
-          # we need to check for validation on field and association
-          register_instance_option :required? do
-            @required ||= !!(abstract_model.model.validators_on(name) + abstract_model.model.validators_on(method_name)).find do |v|
-              v.is_a?(ActiveModel::Validations::PresenceValidator) && !v.options[:allow_nil] ||
-              v.is_a?(ActiveModel::Validations::NumericalityValidator) && !v.options[:allow_nil]
-            end
-          end
-
           register_instance_option :sortable do
-            @sortable ||= associated_model_config.abstract_model.properties.map{ |p| p[:name] }.include?(associated_model_config.object_label_method) ? associated_model_config.object_label_method : {self.abstract_model.model.name => self.method_name}
+            @sortable ||= associated_model_config.abstract_model.properties.map{ |p| p[:name] }.include?(associated_model_config.object_label_method) ? associated_model_config.object_label_method : {self.abstract_model.model.table_name => self.method_name}
           end
 
           register_instance_option :searchable do
-            @searchable ||= associated_model_config.abstract_model.properties.map{ |p| p[:name] }.include?(associated_model_config.object_label_method) ? [associated_model_config.object_label_method, {self.abstract_model.model.name => self.method_name}] : {self.abstract_model.model.name => self.method_name}
+            @searchable ||= associated_model_config.abstract_model.properties.map{ |p| p[:name] }.include?(associated_model_config.object_label_method) ? [associated_model_config.object_label_method, {self.abstract_model.model => self.method_name}] : {self.abstract_model.model => self.method_name}
           end
 
           register_instance_option :partial do
@@ -34,7 +26,7 @@ module RailsAdmin
           end
 
           def associated_model_config
-            @config ||= RailsAdmin.config(association[:parent_model])
+            @config ||= RailsAdmin.config(association[:parent_model_proc].call)
           end
 
           def selected_id

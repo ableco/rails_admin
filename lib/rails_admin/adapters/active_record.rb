@@ -5,7 +5,7 @@ require 'rails_admin/abstract_object'
 module RailsAdmin
   module Adapters
     module ActiveRecord
-      DISABLED_COLUMN_TYPES = [:tsvector]
+      DISABLED_COLUMN_TYPES = [:tsvector, :blob, :binary]
       @@polymorphic_parents = nil
 
       def self.polymorphic_parents(name)
@@ -98,9 +98,9 @@ module RailsAdmin
             :name => association.name.to_sym,
             :pretty_name => association.name.to_s.tr('_', ' ').capitalize,
             :type => association.macro,
-            :parent_model => association_parent_model_lookup(association),
+            :parent_model_proc => Proc.new { association_parent_model_lookup(association) },
             :parent_key => association_parent_key_lookup(association),
-            :child_model => association_child_model_lookup(association),
+            :child_model_proc => Proc.new { association_child_model_lookup(association) },
             :child_key => association_child_key_lookup(association),
             :foreign_type => association_foreign_type_lookup(association),
             :as => association_as_lookup(association),
@@ -119,7 +119,7 @@ module RailsAdmin
       end
 
       def properties
-        columns = model.columns.reject {|c| DISABLED_COLUMN_TYPES.include?(c.type.to_sym) }
+        columns = model.columns.reject {|c| c.type.blank? || DISABLED_COLUMN_TYPES.include?(c.type.to_sym) }
         columns.map do |property|
           {
             :name => property.name.to_sym,
@@ -296,7 +296,7 @@ module RailsAdmin
           association.options[:foreign_type].try(:to_sym) || :"#{association.name}_type"
         end
       end
-      
+
       def association_nested_attributes_options_lookup(association)
         model.nested_attributes_options.try { |o| o[association.name.to_sym] }
       end
