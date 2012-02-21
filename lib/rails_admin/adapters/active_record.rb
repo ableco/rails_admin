@@ -1,40 +1,31 @@
 require 'active_record'
-require 'rails_admin/config/sections/list'
-require 'rails_admin/abstract_object'
+require 'rails_admin/adapters/active_record/abstract_object'
 
 module RailsAdmin
   module Adapters
     module ActiveRecord
-      DISABLED_COLUMN_TYPES = [:tsvector, :blob, :binary]
-      @@polymorphic_parents = nil
-
-      def self.polymorphic_parents(name)
-        @@polymorphic_parents ||= {}.tap do |hash|
-          RailsAdmin::AbstractModel.all_models.each do |klass|
-            klass.reflect_on_all_associations.select{|r| r.options[:as] }.each do |reflection|
-              (hash[reflection.options[:as].to_sym] ||= []) << klass
-            end
-          end
-        end
-        @@polymorphic_parents[name.to_sym]
+      DISABLED_COLUMN_TYPES = [:tsvector, :blob, :binary, :spatial]
+      
+      def new(params = {})
+        AbstractObject.new(model.new(params))
       end
-
+      
       def get(id)
         if object = model.where(model.primary_key => id).first
-          RailsAdmin::AbstractObject.new object
+          AbstractObject.new object
         else
           nil
         end
       end
-
-      def count(options = {}, scope = nil)
-        all(options.merge({:limit => false, :page => false}), scope).count
+      
+      def scoped
+        model.scoped
       end
-
+      
       def first(options = {}, scope = nil)
         all(options, scope).first
       end
-
+      
       def all(options = {}, scope = nil)
         scope ||= self.scoped
         scope = scope.includes(options[:include]) if options[:include]
@@ -45,51 +36,13 @@ module RailsAdmin
         scope = scope.reorder("#{options[:sort]} #{options[:sort_reverse] ? 'asc' : 'desc'}") if options[:sort]
         scope
       end
-
-      def scoped
-        model.scoped
+      
+      def count(options = {}, scope = nil)
+        all(options.merge({:limit => false, :page => false}), scope).count
       end
-
-      def create(params = {})
-        model.create(params)
-      end
-
-      def new(params = {})
-        RailsAdmin::AbstractObject.new(model.new(params))
-      end
-
+      
       def destroy(objects)
-        [objects].flatten.map &:destroy
-      end
-
-      def destroy_all!
-        model.all.each do |object|
-          object.destroy
-        end
-      end
-
-      def has_and_belongs_to_many_associations
-        associations.select do |association|
-          association[:type] == :has_and_belongs_to_many
-        end
-      end
-
-      def has_many_associations
-        associations.select do |association|
-          association[:type] == :has_many
-        end
-      end
-
-      def has_one_associations
-        associations.select do |association|
-          association[:type] == :has_one
-        end
-      end
-
-      def belongs_to_associations
-        associations.select do |association|
-          association[:type] == :belongs_to
-        end
+        Array.wrap(objects).each &:destroy
       end
 
       def associations
@@ -111,13 +64,7 @@ module RailsAdmin
           }
         end
       end
-
-      def polymorphic_associations
-        (has_many_associations + has_one_associations).select do |association|
-          association[:options][:as]
-        end
-      end
-
+      
       def properties
         columns = model.columns.reject {|c| c.type.blank? || DISABLED_COLUMN_TYPES.include?(c.type.to_sym) }
         columns.map do |property|
@@ -131,11 +78,7 @@ module RailsAdmin
           }
         end
       end
-
-      def model_store_exists?
-        model.table_exists?
-      end
-
+      
       def get_conditions_hash(model_config, query, filters)
         @like_operator =  "ILIKE" if ::ActiveRecord::Base.configurations[Rails.env]['adapter'] == "postgresql"
         @like_operator ||= "LIKE"
@@ -191,6 +134,8 @@ module RailsAdmin
         conditions += values
         conditions != [""] ? { :conditions => conditions } : {}
       end
+
+
 
       def build_statement(column, type, value, operator)
 
@@ -260,20 +205,20 @@ module RailsAdmin
           ["(#{column} IN (?))", [value].flatten]
         end
       end
+      
+      private
 
-      def association_options(association)
-        if association.options[:polymorphic]
-          {
-            :polymorphic => true,
-            :foreign_type => association.options[:foreign_type] || "#{association.name}_type"
-          }
-        elsif association.options[:as]
-          {
-            :as => association.options[:as]
-          }
-        else
-          {}
+      @@polymorphic_parents = nil
+
+      def self.polymorphic_parents(name)
+        @@polymorphic_parents ||= {}.tap do |hash|
+          RailsAdmin::AbstractModel.all(:active_record).each do |am|
+            am.model.reflect_on_all_associations.select{|r| r.options[:as] }.each do |reflection|
+              (hash[reflection.options[:as].to_sym] ||= []) << am.model
+            end
+          end
         end
+        @@polymorphic_parents[name.to_sym]
       end
 
       def association_parent_model_lookup(association)
@@ -333,14 +278,7 @@ module RailsAdmin
       end
 
       def association_child_key_lookup(association)
-        case association.macro
-        when :belongs_to
-          association.options[:foreign_key].try(:to_sym) || "#{association.name}_id".to_sym
-        when :has_one, :has_many, :has_and_belongs_to_many
-          association.foreign_key.to_sym
-        else
-          raise "Unknown association type: #{association.macro.inspect}"
-        end
+        association.foreign_key.to_sym
       end
     end
   end

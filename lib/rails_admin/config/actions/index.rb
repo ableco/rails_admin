@@ -17,7 +17,12 @@ module RailsAdmin
         end
         
         register_instance_option :breadcrumb_parent do
-          :dashboard
+          parent_model = bindings[:abstract_model].try(:config).try(:parent)
+          if am = parent_model && RailsAdmin.config(parent_model).try(:abstract_model)
+            [:index, am]
+          else
+            [:dashboard]
+          end
         end
         
         register_instance_option :controller do
@@ -26,7 +31,7 @@ module RailsAdmin
 
             respond_to do |format|
               
-              format.html do  
+              format.html do
                 render @action.template_name, :layout => !request.xhr?, :status => (flash[:error].present? ? :not_found : 200)
               end
               
@@ -67,6 +72,11 @@ module RailsAdmin
             
           end
         end
+      
+      
+        register_instance_option :link_icon do
+          'icon-th-list'
+        end        
       end
     end
   end

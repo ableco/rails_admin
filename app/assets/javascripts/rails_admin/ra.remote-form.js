@@ -64,21 +64,21 @@
       var widget = this,
           dialog = this._getModal(),
           form = dialog.find("form"),
-          saveButtonText = dialog.find(":submit[name=_save]").text(),
-          cancelButtonText = dialog.find(":submit[name=_continue]").text();
-      dialog.find('.actions').remove();
+          saveButtonText = dialog.find(":submit[name=_save]").html(),
+          cancelButtonText = dialog.find(":submit[name=_continue]").html();
+      dialog.find('.form-actions').remove();
       
       form.attr("data-remote", true);
       dialog.find('.modal-header-title').text(form.data('title'));      
       dialog.find('.cancel-action').unbind().click(function(){
         dialog.modal('hide');
         return false;
-      }).text(cancelButtonText);
+      }).html(cancelButtonText);
       
       dialog.find('.save-action').unbind().click(function(){
         form.submit();
         return false;
-      }).text(saveButtonText);
+      }).html(saveButtonText);
       
       form.bind("ajax:complete", function(xhr, data, status) {
         if (status == 'error') {
@@ -119,17 +119,17 @@
       var widget = this;
       if (!widget.dialog) {
         widget.dialog = $('\
-          <div id="modal" class="modal">\
+          <div id="modal" class="modal fade">\
             <div class="modal-header">\
-              <a href="#" class="close">&times;</a>\
+              <a href="#" class="close" data-dismiss="modal">&times;</a>\
               <h3 class="modal-header-title">...</h3>\
             </div>\
             <div class="modal-body">\
               ...\
             </div>\
             <div class="modal-footer">\
-              <a href="#" class="btn secondary cancel-action">...</a>\
-              <a href="#" class="btn primary save-action">...</a>\
+              <a href="#" class="btn cancel-action">...</a>\
+              <a href="#" class="btn btn-primary save-action">...</a>\
             </div>\
           </div>')
           .modal({
@@ -137,7 +137,7 @@
             backdrop: true,
             show: true
           })
-          .bind('hidden', function(){
+          .on('hidden', function(){
             widget.dialog.remove();   // We don't want to reuse closed modals
             widget.dialog = null;
           });

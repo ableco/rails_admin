@@ -31,10 +31,10 @@ RailsAdmin.config do |config|
 
   #  ==> Included models
   # Add all excluded models here:
-  # config.excluded_models = [<%= RailsAdmin::AbstractModel.all_models.map(&:name).join(', ') %>]
+  # config.excluded_models = [<%= RailsAdmin::AbstractModel.all.map{|am| am.model.to_s }.join(', ') %>]
 
   # Add models here if you want to go 'whitelist mode':
-  # config.included_models = [<%= RailsAdmin::AbstractModel.all_models.map(&:name).join(', ') %>]
+  # config.included_models = [<%= RailsAdmin::AbstractModel.all.map{|am| am.model.to_s }.join(', ') %>]
 
   # Application wide tried label methods for models' instances
   # config.label_methods << :description # Default is [:name, :title]
@@ -82,11 +82,11 @@ RailsAdmin.config do |config|
 <% RailsAdmin::AbstractModel.all.map do |abstract_model| -%>
   # config.model <%= abstract_model.model.model_name %> do
   #   # Found associations:
-<%= RailsAdmin.config(abstract_model).export.fields.select{|f| f.association?}.map do |field|
+<%= abstract_model.config.export.fields.select{|f| f.association?}.map do |field|
 %{  #     configure #{field.name.inspect}, #{field.type.inspect}#{"         # Hidden" unless field.visible?} }
 end.join("\n") -%>
   #   # Found columns:
-<%= RailsAdmin.config(abstract_model).export.fields.select{|f| !f.association?}.map do |field|
+<%= abstract_model.config.export.fields.select{|f| !f.association?}.map do |field|
 %{  #     configure #{field.name.inspect}, #{field.type.inspect}#{"         # Hidden" unless field.visible?} }
 end.join("\n") -%>
   #   # Sections:

@@ -1,15 +1,27 @@
-require 'rails_admin/config/base'
+require 'rails_admin/config/proxyable'
+require 'rails_admin/config/configurable'
 require 'rails_admin/config/hideable'
 
 module RailsAdmin
   module Config
     module Actions
-      class Base < RailsAdmin::Config::Base
+      class Base
+        include RailsAdmin::Config::Proxyable
+        include RailsAdmin::Config::Configurable
         include RailsAdmin::Config::Hideable
+        
+        # http://twitter.github.com/bootstrap/base-css.html#icons
+        register_instance_option :link_icon do
+          'icon-question-sign'
+        end
         
         # Should the action be visible
         register_instance_option :visible? do
-          true
+          authorized? && (bindings[:abstract_model] ? bindings[:abstract_model].config.with(bindings).try(:visible?) : true)
+        end
+        
+        register_instance_option :authorized? do
+          bindings[:controller] ? bindings[:controller].authorized?(self.authorization_key, bindings[:abstract_model], bindings[:object]) : true
         end
         
         # Is the action acting on the root level (Example: /admin/contact)
@@ -17,19 +29,20 @@ module RailsAdmin
           false
         end
         
-        # Is the action on a model scope (Example: /admin/teams/export)
+        # Is the action on a model scope (Example: /admin/team/export)
         register_instance_option :collection? do
           false
         end
         
-        # Is the action on an object scope (Example: /admin/teams/1/edit)
+        # Is the action on an object scope (Example: /admin/team/1/edit)
         register_instance_option :member? do
           false
         end
         
         # This block is evaluated in the context of the controller when action is called
         # You can access:
-        # - @abstract_model & @model_config if your on a model or object scope
+        # - @objects if you're on a model scope
+        # - @abstract_model & @model_config if you're on a model or object scope
         # - @object if you're on an object scope
         register_instance_option :controller do
           Proc.new do
@@ -79,16 +92,15 @@ module RailsAdmin
         
         # Breadcrumb parent
         register_instance_option :breadcrumb_parent do
-          case 
+          case
           when root?
-            :dashboard
+            [:dashboard]
           when collection?
-            :index
+            [:index, bindings[:abstract_model]]
           when member?
-            :show
+            [:show, bindings[:abstract_model], bindings[:object]]
           end
         end
-        
         
         # Off API.
         

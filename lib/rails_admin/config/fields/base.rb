@@ -1,27 +1,34 @@
 require 'active_support/core_ext/string/inflections'
-require 'rails_admin/config/base'
+require 'active_model/mass_assignment_security'
+
+require 'rails_admin/config/proxyable'
+require 'rails_admin/config/configurable'
 require 'rails_admin/config/hideable'
 require 'rails_admin/config/fields'
 require 'rails_admin/config/fields/association'
 require 'rails_admin/config/fields/groupable'
 
-
 module RailsAdmin
   module Config
     module Fields
-      class Base < RailsAdmin::Config::Base
-        attr_reader :name, :properties
+      class Base
+        include RailsAdmin::Config::Proxyable
+        include RailsAdmin::Config::Configurable
+        include RailsAdmin::Config::Hideable
+        
+        attr_reader :name, :properties, :abstract_model
         attr_accessor :defined, :order, :section
-
+        attr_reader :parent, :root
+        
         def self.inherited(klass)
           klass.instance_variable_set("@view_helper", :text_field)
         end
 
-        include RailsAdmin::Config::Hideable
-
         def initialize(parent, name, properties)
-          super(parent)
-          
+          @parent = parent
+          @root = parent.root
+
+          @abstract_model = parent.abstract_model
           @defined = false
           @name = name
           @order = 0
@@ -48,15 +55,15 @@ module RailsAdmin
         end
         
         register_instance_option(:sortable) do
-          !virtual?
+          !virtual? || children_fields.first || false
         end
 
         register_instance_option(:searchable) do
-          !virtual?
+          !virtual? || children_fields.first || false
         end
 
         register_instance_option(:queryable?) do
-          !!searchable
+          !virtual?
         end
 
         register_instance_option(:filterable?) do
@@ -155,7 +162,7 @@ module RailsAdmin
             v.is_a?(ActiveModel::Validations::LengthValidator)}.try{|v| v.options} || {}
         end
 
-        register_instance_option(:partial) do
+        register_instance_option :partial do
           :form_field
         end
 
@@ -163,9 +170,11 @@ module RailsAdmin
         #
         # @see RailsAdmin::AbstractModel.properties
         register_instance_option(:required?) do
-          @required ||= !!abstract_model.model.validators_on(name).find do |v|
-            v.is_a?(ActiveModel::Validations::PresenceValidator) && !v.options[:allow_nil] ||
-            v.is_a?(ActiveModel::Validations::NumericalityValidator) && !v.options[:allow_nil]
+          @required ||= !!([name] + children_fields).uniq.find do |column_name|
+            !!abstract_model.model.validators_on(column_name).find do |v|
+              v.is_a?(ActiveModel::Validations::PresenceValidator) && !v.options[:allow_nil] ||
+              v.is_a?(ActiveModel::Validations::NumericalityValidator) && !v.options[:allow_nil]
+            end
           end
         end
 
@@ -184,6 +193,11 @@ module RailsAdmin
           not editable
         end
         
+        # init status in the view
+        register_instance_option :active? do
+          false
+        end
+
         register_instance_option :visible? do
           returned = true
           (RailsAdmin.config.default_hidden_fields || {}).each do |section, fields|
@@ -194,18 +208,20 @@ module RailsAdmin
           returned
         end
         
-        def editable
-          return false if @properties && @properties[:read_only]
-          role = bindings[:view].controller.send(:_attr_accessible_role)
-          klass = bindings[:object].class
-          whitelist = klass.accessible_attributes(role).map(&:to_s)
-          blacklist = klass.protected_attributes(role).map(&:to_s)
-          !self.method_name.to_s.in?(blacklist) && (whitelist.any? ? self.method_name.to_s.in?(whitelist) : true)
+        # columns mapped (belongs_to, paperclip, etc.). First one is used for searching/sorting by default
+        register_instance_option :children_fields do
+          []
         end
         
-        def render
+        register_instance_option :render do
           bindings[:view].render :partial => partial.to_s, :locals => {:field => self, :form => bindings[:form] }
         end
+
+        def editable
+          return false if @properties && @properties[:read_only]
+          !bindings[:object].class.active_authorizer[bindings[:view].controller.send(:_attr_accessible_role)].deny?(self.method_name)
+        end
+        
 
         # Is this an association
         def association?
@@ -214,7 +230,9 @@ module RailsAdmin
 
         # Reader for validation errors of the bound object
         def errors
-          bindings[:object].errors[name]
+          ([name] + children_fields).uniq.map do |column_name|
+            bindings[:object].errors[column_name]
+          end.uniq.flatten
         end
 
         # Reader whether field is optional.

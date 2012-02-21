@@ -20,8 +20,8 @@ describe RailsAdmin::ApplicationHelper do
           end
         end
       end
-      
-      helper.action(:my_custom_dashboard_key).should == RailsAdmin::Config::Actions.find(:my_custom_dashboard_key)
+      controller.should_receive(:authorized?).exactly(1).times.and_return(true)
+      helper.action(:my_custom_dashboard_key).should be
     end
     
     it 'should return only visible actions' do
@@ -35,7 +35,7 @@ describe RailsAdmin::ApplicationHelper do
       
       helper.action(:dashboard).should == nil
     end
-    
+        
     it 'should return only visible actions, passing all bindings' do
       RailsAdmin.config do |config|
         config.actions do
@@ -48,10 +48,9 @@ describe RailsAdmin::ApplicationHelper do
           end
         end
       end
-      
-      helper.action(:test_bindings, RailsAdmin::AbstractModel.new(Team), Team.new).should == RailsAdmin::Config::Actions.find(:test_bindings)
-      helper.action(:test_bindings, RailsAdmin::AbstractModel.new(Team), Player.new).should == nil
-      helper.action(:test_bindings, RailsAdmin::AbstractModel.new(Player), Team.new).should == nil
+      helper.action(:test_bindings, RailsAdmin::AbstractModel.new(Team), Team.new).should be
+      helper.action(:test_bindings, RailsAdmin::AbstractModel.new(Team), Player.new).should be_nil
+      helper.action(:test_bindings, RailsAdmin::AbstractModel.new(Player), Team.new).should be_nil
     end
   end
   
@@ -59,6 +58,7 @@ describe RailsAdmin::ApplicationHelper do
     it 'should return actions by type' do
       abstract_model = RailsAdmin::AbstractModel.new(Player)
       object = FactoryGirl.create :player
+      controller.should_receive(:authorized?).exactly(22).times.and_return(true)
       helper.actions(:all, abstract_model, object).map(&:custom_key).should == [:dashboard, :index, :show, :new, :edit, :export, :delete, :bulk_delete, :history_show, :history_index, :show_in_app]
       helper.actions(:root, abstract_model, object).map(&:custom_key).should == [:dashboard]
       helper.actions(:collection, abstract_model, object).map(&:custom_key).should == [:index, :new, :export, :bulk_delete, :history_index]
@@ -118,10 +118,9 @@ describe RailsAdmin::ApplicationHelper do
   end
   
   describe "#breadcrumb" do
-    it "gives us a breadcrumb, dammit" do
-      @action = RailsAdmin::Config::Actions.find :edit
-      @abstract_model = RailsAdmin::AbstractModel.new(Team)
-      @object = Team.new(:name => 'the avengers')
+    it "gives us a breadcrumb" do
+      @action = RailsAdmin::Config::Actions.find(:edit, {:abstract_model => RailsAdmin::AbstractModel.new(Team), :object => Team.new(:name => 'the avengers')})
+      controller.should_receive(:authorized?).exactly(3).times.and_return(true)
       bc = helper.breadcrumb
       bc.should match /Dashboard/ # dashboard
       bc.should match /Teams/ # list
@@ -154,8 +153,9 @@ describe RailsAdmin::ApplicationHelper do
       @action = RailsAdmin::Config::Actions.find :show
       @abstract_model = RailsAdmin::AbstractModel.new(Team)
       @object = Team.new(:name => 'the avengers')
-
-      helper.menu_for(:root).should match /Dashboard/
+      controller.should_receive(:authorized?).exactly(3).times.and_return(true)
+      
+      helper.menu_for(:root).should match /Dashboard/ 
       helper.menu_for(:collection, @abstract_model).should match /List/
       helper.menu_for(:member, @abstract_model, @object).should match /Show/
       
@@ -175,7 +175,78 @@ describe RailsAdmin::ApplicationHelper do
       end
       
       @action = RailsAdmin::Config::Actions.find :dashboard
+      controller.should_receive(:authorized?).exactly(1).times.and_return(true)
       helper.menu_for(:root).should_not match /Dashboard/
+    end
+  end
+  
+  describe "#main_navigation" do
+    it 'should show included models' do
+      RailsAdmin.config do |config|
+        config.included_models = [Ball, Comment]
+      end
+      helper.main_navigation.should match /(nav\-header).*(Navigation).*(Balls).*(Comments)/m
+    end
+    
+    it 'should not show unvisible models' do
+      RailsAdmin.config do |config|
+        config.included_models = [Ball, Comment]
+        config.model Comment do
+          hide
+        end
+      end
+      result = helper.main_navigation
+      result.should match /(nav\-header).*(Navigation).*(Balls)/m
+      result.should_not match "Comments"
+    end
+    
+    it "should show children of hidden models" do # https://github.com/sferik/rails_admin/issues/978
+      RailsAdmin.config do |config|
+        config.included_models = [Ball, Hardball]
+        config.model Ball do
+          hide
+        end
+      end
+      helper.main_navigation.should match /(nav\-header).*(Navigation).*(Hardballs)/m
+    end
+    
+    it "should show children of excluded models" do
+      RailsAdmin.config do |config|
+        config.included_models = [Hardball]
+      end
+      helper.main_navigation.should match /(nav\-header).*(Navigation).*(Hardballs)/m
+    end
+    
+    it 'should "nest" in navigation label' do
+      RailsAdmin.config do |config|
+        config.included_models = [Comment]
+        config.model Comment do
+          navigation_label 'commentable'
+        end
+      end
+      helper.main_navigation.should match /(nav\-header).*(commentable).*(Comments)/m
+    end
+    
+    it 'should "nest" in parent model' do
+      RailsAdmin.config do |config|
+        config.included_models = [Player, Comment]
+        config.model Comment do
+          parent Player
+        end
+      end
+      helper.main_navigation.should match /(Players).*(nav\-level\-1).*(Comments)/m
+    end
+    
+    it 'should order' do
+      RailsAdmin.config do |config|
+        config.included_models = [Player, Comment]
+      end
+      helper.main_navigation.should match /(Comments).*(Players)/m
+      
+      RailsAdmin.config(Comment) do 
+        weight 1
+      end
+      helper.main_navigation.should match /(Players).*(Comments)/m
     end
   end
   
@@ -197,7 +268,7 @@ describe RailsAdmin::ApplicationHelper do
         end
       end
       @action = RailsAdmin::Config::Actions.find :index
-      
+      controller.should_receive(:authorized?).exactly(2).times.and_return(true)
       result = helper.bulk_menu(RailsAdmin::AbstractModel.new(Team))
       result.should match "zorg_action"
       result.should match "blub"

@@ -159,7 +159,7 @@ Here are some ways *you* can contribute:
 * by using alpha, beta, and prerelease versions
 * by reporting bugs
 * by suggesting new features
-* by [translating to a new language](https://github.com/sferik/rails_admin/tree/master/config/locales)
+* by [translating to a new language](https://github.com/sferik/rails_admin/wiki/Translations)
 * by writing or editing documentation
 * by writing specifications
 * by writing code (**no patch is too small**: fix typos, add comments, clean up inconsistent whitespace)
@@ -196,9 +196,11 @@ implementations:
 * Ruby 1.9.3
 * [Rubinius][]
 * [Ruby Enterprise Edition][ree]
+* [JRuby][jruby]
 
 [rubinius]: http://rubini.us/
 [ree]: http://www.rubyenterpriseedition.com/
+[jruby]:http://jruby.org/
 
 ## <a name="screenshots"></a>Screenshots
 ![Dashboard view](https://github.com/sferik/rails_admin/raw/master/screenshots/dashboard.png "dashboard view")

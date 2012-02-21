@@ -15,9 +15,9 @@ module RailsAdmin
     RailsAdmin::Config::Actions.all.each do |action|
       class_eval %{
         def #{action.action_name}
-          @action = RailsAdmin::Config::Actions.find('#{action.action_name}'.to_sym, {:controller => self, :abstract_model => @abstract_model, :object => @object})
-          
-          @authorization_adapter.try(:authorize, @action.authorization_key, @abstract_model, @object)
+          action = RailsAdmin::Config::Actions.find('#{action.action_name}'.to_sym)
+          @authorization_adapter.try(:authorize, action.authorization_key, @abstract_model, @object)
+          @action = action.with({:controller => self, :abstract_model => @abstract_model, :object => @object})
           @page_name = wording_for(:title)
           @page_type = @abstract_model && @abstract_model.pretty_name.downcase || "dashboard"
           
@@ -127,7 +127,7 @@ module RailsAdmin
     def get_association_scope_from_params
       return nil unless params[:associated_collection].present?
       source_abstract_model = RailsAdmin::AbstractModel.new(to_model_name(params[:source_abstract_model]))
-      source_model_config = RailsAdmin.config(source_abstract_model)
+      source_model_config = source_abstract_model.config
       source_object = source_abstract_model.get(params[:source_object_id])
       action = params[:current_action].in?(['create', 'update']) ? params[:current_action] : 'edit'
       association = source_model_config.send(action).fields.find{|f| f.name == params[:associated_collection].to_sym }.with(:controller => self, :object => source_object)
