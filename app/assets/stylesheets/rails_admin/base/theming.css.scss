@@ -4,14 +4,14 @@
 */
 
 body.rails_admin {
-  
+
   .thumbnail {
     display:inline-block;
   }
 
   /* room for upper navbar */
   padding-top: 60px;
-  
+
   /* Application name */
   .navbar .brand {
     small {
@@ -19,22 +19,60 @@ body.rails_admin {
       font-weight:bold;
     }
   }
-  
+
   .sidebar-nav {
     padding: 9px 0;
   }
-  
+
   /* fat labels in forms */
   .label.form-label {
     padding: 7px 7px 8px 7px;
   }
-  
+
   /* new/edit/export forms */
   .form-horizontal {
+    /* hide hidden fields controls by default */
+    .control-group .hidden_type {
+      display:none;
+    }
+    
     legend {
       cursor:pointer;
       i {
         vertical-align: inherit !important;
+      }
+    }
+    
+    &.denser {
+      .controls .nav {
+        margin-bottom:5px;
+      }
+      .remove_nested_fields {
+        position:absolute;
+      }
+      margin:0px;
+      p {
+        font-size: 12px;
+        line-height: 16px;
+      }
+      .help-block {
+        margin-top: 0px;
+      }
+      .input-prepend, .input-append {
+        margin-bottom: 0px;
+        label {
+          margin-bottom: 0px;
+        }
+      }
+      .control-group {
+        margin: 0px;
+        padding-top:15px;
+      }
+      .control-label {
+        width:145px;
+      }
+      legend {
+        margin-bottom:0px;
       }
     }
     
@@ -48,9 +86,16 @@ body.rails_admin {
     input[type=file] {
       display:block;
     }
-    
+
     /* nested forms */
     .tab-content .tab-pane {
+      &>.remove_nested_fields {
+        display:none;
+      }
+      &:hover>.remove_nested_fields {
+        display:block;
+      }
+      
       border-left:5px solid $blue;
       padding-left:5px;
       fieldset {
@@ -65,14 +110,13 @@ body.rails_admin {
         }
       }
     }
-    
+
     /* double nesting, guys. Easy. */
     .tab-content .tab-content .tab-pane {
       border-color:lighten($blue, 20%);
       margin-left:10px;
       fieldset {
         margin-left:-20px;
-        margin-bottom: -18px;
         .control-group > label {
           padding-left:20px;
           width:120px;
@@ -82,7 +126,7 @@ body.rails_admin {
         }
       }
     }
-    
+
     /* triple nesting!*/
     .tab-content .tab-content .tab-content .tab-pane {
       border-color:lighten($blue, 30%);
@@ -98,7 +142,7 @@ body.rails_admin {
         }
       }
     }
-    
+
     /* totally awesome! nesting on 4 levels! */
     .tab-content .tab-content .tab-content  .tab-content .tab-pane {
       border-color:lighten($blue, 40%);
@@ -120,28 +164,21 @@ body.rails_admin {
     width: 750px;
     margin-left: -375px;
   }
-  
-  /* needed while https://github.com/thomas-mcdonald/bootstrap-sass/commit/6c37fa981b14502748f0935bd385e11ccc965a3f isn't released */
-  .nav-list .active > a:hover {
-    color: $white;
-    text-shadow: 0 -1px 0 rgba(0,0,0,.2);
-    background-color: $linkColor;
-  }
-  
+
   /* nested nav */
   .nav.nav-list {
     .nav-level-1 {
-      padding-left:20px;
-    }
-    .nav-level-2 {
       padding-left:30px;
     }
+    .nav-level-2 {
+      padding-left:60px;
+    }
     .nav-level-3 {
-      padding-left:40px;
+      padding-left:90px;
     }
   }
 
-  /* tab links should match icon color */ 
+  /* tab links should match icon color */
   .nav.nav-tabs li.icon a {
     color: $black;
   }
@@ -203,7 +240,7 @@ body.rails_admin {
       text-overflow: ellipsis;
       max-width:150px;
     }
-    
+
     /* icons */
     td.links {
       max-width: none;

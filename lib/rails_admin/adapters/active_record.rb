@@ -4,12 +4,14 @@ require 'rails_admin/adapters/active_record/abstract_object'
 module RailsAdmin
   module Adapters
     module ActiveRecord
-      DISABLED_COLUMN_TYPES = [:tsvector, :blob, :binary, :spatial]
-      
+      DISABLED_COLUMN_TYPES = [:tsvector, :blob, :binary, :spatial, :hstore]
+      AR_ADAPTER = ::ActiveRecord::Base.configurations[Rails.env]['adapter']
+      LIKE_OPERATOR = AR_ADAPTER == "postgresql" ? 'ILIKE' : 'LIKE'
+
       def new(params = {})
         AbstractObject.new(model.new(params))
       end
-      
+
       def get(id)
         if object = model.where(model.primary_key => id).first
           AbstractObject.new object
@@ -17,32 +19,37 @@ module RailsAdmin
           nil
         end
       end
-      
+
       def scoped
         model.scoped
       end
-      
+
       def first(options = {}, scope = nil)
         all(options, scope).first
       end
-      
+
       def all(options = {}, scope = nil)
         scope ||= self.scoped
         scope = scope.includes(options[:include]) if options[:include]
         scope = scope.limit(options[:limit]) if options[:limit]
         scope = scope.where(model.primary_key => options[:bulk_ids]) if options[:bulk_ids]
-        scope = scope.where(options[:conditions]) if options[:conditions]
+        scope = scope.where(query_conditions(options[:query])) if options[:query]
+        scope = scope.where(filter_conditions(options[:filters])) if options[:filters]
         scope = scope.page(options[:page]).per(options[:per]) if options[:page] && options[:per]
         scope = scope.reorder("#{options[:sort]} #{options[:sort_reverse] ? 'asc' : 'desc'}") if options[:sort]
         scope
       end
-      
+
       def count(options = {}, scope = nil)
         all(options.merge({:limit => false, :page => false}), scope).count
       end
-      
+
       def destroy(objects)
         Array.wrap(objects).each &:destroy
+      end
+
+      def primary_key
+        model.primary_key
       end
 
       def associations
@@ -51,10 +58,9 @@ module RailsAdmin
             :name => association.name.to_sym,
             :pretty_name => association.name.to_s.tr('_', ' ').capitalize,
             :type => association.macro,
-            :parent_model_proc => Proc.new { association_parent_model_lookup(association) },
-            :parent_key => association_parent_key_lookup(association),
-            :child_model_proc => Proc.new { association_child_model_lookup(association) },
-            :child_key => association_child_key_lookup(association),
+            :model_proc => Proc.new { association_model_lookup(association) },
+            :primary_key_proc => Proc.new { association_primary_key_lookup(association) },
+            :foreign_key => association_foreign_key_lookup(association),
             :foreign_type => association_foreign_type_lookup(association),
             :as => association_as_lookup(association),
             :polymorphic => association_polymorphic_lookup(association),
@@ -64,7 +70,7 @@ module RailsAdmin
           }
         end
       end
-      
+
       def properties
         columns = model.columns.reject {|c| c.type.blank? || DISABLED_COLUMN_TYPES.include?(c.type.to_sym) }
         columns.map do |property|
@@ -78,67 +84,64 @@ module RailsAdmin
           }
         end
       end
-      
-      def get_conditions_hash(model_config, query, filters)
-        @like_operator =  "ILIKE" if ::ActiveRecord::Base.configurations[Rails.env]['adapter'] == "postgresql"
-        @like_operator ||= "LIKE"
 
-        query_statements = []
-        filters_statements = []
-        values = []
-        conditions = [""]
-
-        if query.present?
-          queryable_fields = model_config.list.fields.select(&:queryable?)
-          queryable_fields.each do |field|
-            searchable_columns = field.searchable_columns.flatten
-            searchable_columns.each do |field_infos|
-              statement, value1, value2 = build_statement(field_infos[:column], field_infos[:type], query, field.search_operator)
-              if statement
-                query_statements << statement
-                values << value1 unless value1.nil?
-                values << value2 unless value2.nil?
-              end
-            end
-          end
-        end
-
-        unless query_statements.empty?
-          conditions[0] += " AND " unless conditions == [""]
-          conditions[0] += "(#{query_statements.join(" OR ")})"
-        end
-
-        if filters.present?
-          @filterable_fields = model_config.list.fields.select(&:filterable?).inject({}){ |memo, field| memo[field.name.to_sym] = field.searchable_columns; memo }
-          filters.each_pair do |field_name, filters_dump|
-            filters_dump.each do |filter_index, filter_dump|
-              field_statements = []
-              @filterable_fields[field_name.to_sym].each do |field_infos|
-                statement, value1, value2 = build_statement(field_infos[:column], field_infos[:type], filter_dump[:v], (filter_dump[:o] || 'default'))
-                if statement
-                  field_statements << statement
-                  values << value1 unless value1.nil?
-                  values << value2 unless value2.nil?
-                end
-              end
-              filters_statements << "(#{field_statements.join(' OR ')})" unless field_statements.empty?
-            end
-          end
-        end
-
-        unless filters_statements.empty?
-         conditions[0] += " AND " unless conditions == [""]
-         conditions[0] += "#{filters_statements.join(" AND ")}" # filters should all be true
-        end
-
-        conditions += values
-        conditions != [""] ? { :conditions => conditions } : {}
+      def table_name
+        model.table_name
       end
 
+      def serialized_attributes
+        model.serialized_attributes.keys
+      end
 
+      def encoding
+        Rails.configuration.database_configuration[Rails.env]['encoding']
+      end
+
+      def embedded?
+        false
+      end
+
+      private
+
+      def query_conditions(query, fields = config.list.fields.select(&:queryable?))
+        statements = []
+        values = []
+
+        fields.each do |field|
+          field.searchable_columns.flatten.each do |column_infos|
+            statement, value1, value2 = build_statement(column_infos[:column], column_infos[:type], query, field.search_operator)
+            statements << statement if statement
+            values << value1 unless value1.nil?
+            values << value2 unless value2.nil?
+          end
+        end
+
+        [statements.join(' OR '), *values]
+      end
+
+      # filters example => {"string_field"=>{"0055"=>{"o"=>"like", "v"=>"test_value"}}, ...}
+      # "0055" is the filter index, no use here. o is the operator, v the value
+      def filter_conditions(filters, fields = config.list.fields.select(&:filterable?))
+        statements = []
+        values = []
+
+        filters.each_pair do |field_name, filters_dump|
+          filters_dump.each do |filter_index, filter_dump|
+            field_statements = []
+            fields.find{|f| f.name.to_s == field_name}.searchable_columns.each do |column_infos|
+              statement, value1, value2 = build_statement(column_infos[:column], column_infos[:type], filter_dump[:v], (filter_dump[:o] || 'default'))
+              field_statements << statement if statement.present?
+              values << value1 unless value1.nil?
+              values << value2 unless value2.nil?
+            end
+            statements << "(#{field_statements.join(' OR ')})" unless field_statements.empty?
+          end
+        end
+
+        [statements.join(' AND '), *values]
+      end
 
       def build_statement(column, type, value, operator)
-
         # this operator/value has been discarded (but kept in the dom to override the one stored in the various links of the page)
         return if operator == '_discard' || value == '_discard'
 
@@ -176,63 +179,41 @@ module RailsAdmin
             "%#{value}"
           when 'is', '='
             "#{value}"
+          else
+            return
           end
-          ["(#{column} #{@like_operator} ?)", value]
-        when :datetime, :timestamp, :date
-          return unless operator != 'default'
-          values = case operator
-          when 'today'
-            [Date.today.beginning_of_day, Date.today.end_of_day]
-          when 'yesterday'
-            [Date.yesterday.beginning_of_day, Date.yesterday.end_of_day]
-          when 'this_week'
-            [Date.today.beginning_of_week.beginning_of_day, Date.today.end_of_week.end_of_day]
-          when 'last_week'
-            [1.week.ago.to_date.beginning_of_week.beginning_of_day, 1.week.ago.to_date.end_of_week.end_of_day]
-          when 'less_than'
-            return if value.blank?
-            [value.to_i.days.ago, DateTime.now]
-          when 'more_than'
-            return if value.blank?
-            [2000.years.ago, value.to_i.days.ago]
-          when 'mmddyyyy'
-            return if (value.blank? || value.match(/([0-9]{8})/).nil?)
-            [Date.strptime(value.match(/([0-9]{8})/)[1], '%m%d%Y').beginning_of_day, Date.strptime(value.match(/([0-9]{8})/)[1], '%m%d%Y').end_of_day]
+          ["(#{column} #{LIKE_OPERATOR} ?)", value]
+        when :date
+          start_date, end_date = get_filtering_duration(operator, value)
+
+          if start_date && end_date
+            ["(#{column} BETWEEN ? AND ?)", start_date, end_date]
+          elsif start_date
+            ["(#{column} >= ?)", start_date]
+          elsif end_date
+            ["(#{column} <= ?)", end_date]
           end
-          ["(#{column} BETWEEN ? AND ?)", *values]
+        when :datetime, :timestamp
+          start_date, end_date = get_filtering_duration(operator, value)
+
+          if start_date && end_date
+            ["(#{column} BETWEEN ? AND ?)", start_date.to_time.beginning_of_day, end_date.to_time.end_of_day]
+          elsif start_date
+            ["(#{column} >= ?)", start_date.to_time.beginning_of_day]
+          elsif end_date
+            ["(#{column} <= ?)", end_date.to_time.end_of_day]
+          end
         when :enum
           return if value.blank?
-          ["(#{column} IN (?))", [value].flatten]
+          ["(#{column} IN (?))", Array.wrap(value)]
         end
       end
-      
-      private
 
-      @@polymorphic_parents = nil
-
-      def self.polymorphic_parents(name)
-        @@polymorphic_parents ||= {}.tap do |hash|
-          RailsAdmin::AbstractModel.all(:active_record).each do |am|
-            am.model.reflect_on_all_associations.select{|r| r.options[:as] }.each do |reflection|
-              (hash[reflection.options[:as].to_sym] ||= []) << am.model
-            end
-          end
-        end
-        @@polymorphic_parents[name.to_sym]
-      end
-
-      def association_parent_model_lookup(association)
-        case association.macro
-        when :belongs_to
-          if association.options[:polymorphic]
-            RailsAdmin::Adapters::ActiveRecord.polymorphic_parents(association.name) || []
-          else
-            association.klass
-          end
-        when :has_one, :has_many, :has_and_belongs_to_many
-          association.active_record
+      def association_model_lookup(association)
+        if association.options[:polymorphic]
+          RailsAdmin::AbstractModel.polymorphic_parents(:active_record, association.name) || []
         else
-          raise "Unknown association type: #{association.macro.inspect}"
+          association.klass
         end
       end
 
@@ -251,11 +232,11 @@ module RailsAdmin
       end
 
       def association_polymorphic_lookup(association)
-        association.options[:polymorphic]
+        !!association.options[:polymorphic]
       end
 
-      def association_parent_key_lookup(association)
-        [:id]
+      def association_primary_key_lookup(association)
+        association.options[:primary_key] || association.klass.primary_key
       end
 
       def association_inverse_of_lookup(association)
@@ -266,18 +247,7 @@ module RailsAdmin
         association.options[:readonly]
       end
 
-      def association_child_model_lookup(association)
-        case association.macro
-        when :belongs_to
-          association.active_record
-        when :has_one, :has_many, :has_and_belongs_to_many
-          association.klass
-        else
-          raise "Unknown association type: #{association.macro.inspect}"
-        end
-      end
-
-      def association_child_key_lookup(association)
+      def association_foreign_key_lookup(association)
         association.foreign_key.to_sym
       end
     end

@@ -26,7 +26,7 @@ describe "RailsAdmin Basic Show" do
       should have_content(@player.number)
     end
   end
-  
+
   describe "GET /admin/players/123this-id-doesnt-exist" do
     it "should raise NotFound" do
       visit '/admin/players/123this-id-doesnt-exist'
@@ -39,7 +39,7 @@ describe "RailsAdmin Basic Show" do
     before(:each) do
       @player = FactoryGirl.create :player
       @team   = FactoryGirl.create :team
-      @player.update_attribute(:team, @team)
+      @player.update_attribute(:team_id, @team.id)
       visit show_path(:model_name => "player", :id => @player.id)
     end
 

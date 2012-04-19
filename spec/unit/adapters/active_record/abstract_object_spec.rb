@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe "AbstractObject" do
+describe "AbstractObject", :active_record => true do
   describe "proxy" do
     let(:object) { mock("object") }
     let(:abstract_object) { RailsAdmin::Adapters::ActiveRecord::AbstractObject.new(object) }
@@ -38,7 +38,8 @@ describe "AbstractObject" do
     end
 
     describe "a record with protected attributes and has_one association" do
-      let(:draft) { Factory :draft }
+      let(:draft) { FactoryGirl.create(:draft) }
+      let(:number) { draft.player.number + 1 } # to avoid collision
 
       before do
         object.set_attributes({ :name => name, :number => number, :position => position, :suspended => suspended, :team_id => nil, :draft_id => draft.id })
@@ -61,7 +62,7 @@ describe "AbstractObject" do
       let(:league) { League.new }
       let(:object) { RailsAdmin::Adapters::ActiveRecord::AbstractObject.new league }
       let(:name) { "Awesome League" }
-      let(:teams) { [Factory(:team)] }
+      let(:teams) { [FactoryGirl.create(:team)] }
       let(:divisions) { [Division.create!(:name => 'div 1', :league => League.create!(:name => 'north')), Division.create!(:name => 'div 2', :league => League.create!(:name => 'south'))] }
 
       before do
@@ -81,9 +82,9 @@ describe "AbstractObject" do
     describe "a record with protected attributes and has_one association" do
       let(:name) { "Stefan Koza" }
       let(:suspended) { true }
-      let(:player) { Factory :player, :suspended => true, :name => name, :draft => Factory(:draft) }
+      let(:player) { FactoryGirl.create(:player, :suspended => true, :name => name, :draft => FactoryGirl.create(:draft)) }
       let(:object) { RailsAdmin::Adapters::ActiveRecord::AbstractObject.new player }
-      let(:new_team) { Factory :team }
+      let(:new_team) { FactoryGirl.create(:team) }
       let(:new_suspended) { false }
       let(:new_draft) { nil }
       let(:new_number) { player.number + 29 }
@@ -105,7 +106,7 @@ describe "AbstractObject" do
   end
 
   describe "destroy" do
-    let(:player) { Factory :player }
+    let(:player) { FactoryGirl.create(:player) }
     let(:object) { RailsAdmin::Adapters::ActiveRecord::AbstractObject.new player }
 
     before do
@@ -116,7 +117,7 @@ describe "AbstractObject" do
       Player.exists?(player.id).should == false
     end
   end
-  
+
   describe "object_label_method" do
     it 'should be configurable' do
       RailsAdmin.config League do
@@ -126,23 +127,6 @@ describe "AbstractObject" do
       @league = FactoryGirl.create :league
 
       RailsAdmin.config('League').with(:object => @league).object_label.should == "League '#{@league.name}'"
-    end
-  end
-  
-  describe "model store does not exist" do
-    before(:each)  { drop_all_tables }
-    after(:all)    { migrate_database }
-
-    it "should not raise an error when the model tables do not exists" do
-      config_setup = lambda do
-        RailsAdmin.config Team do
-          edit do
-            field :name
-          end
-        end
-      end
-
-      config_setup.should_not raise_error
     end
   end
 end

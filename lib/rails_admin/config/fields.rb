@@ -8,7 +8,7 @@ module RailsAdmin
       mattr_reader :default_factory
       @@default_factory = lambda do |parent, properties, fields|
         # If it's an association
-        if properties.has_key?(:parent_model_proc)
+        if properties.has_key?(:model_proc)
           association = parent.abstract_model.associations.find {|a| a[:name].to_s == properties[:name].to_s}
           field = RailsAdmin::Config::Fields::Types.load("#{association[:polymorphic] ? :polymorphic : properties[:type]}_association").new(parent, properties[:name], association)
         else
@@ -84,4 +84,5 @@ require 'rails_admin/config/fields/factories/devise'
 require 'rails_admin/config/fields/factories/paperclip'
 require 'rails_admin/config/fields/factories/dragonfly'
 require 'rails_admin/config/fields/factories/carrierwave'
-require 'rails_admin/config/fields/factories/belongs_to_association'
+require 'rails_admin/config/fields/factories/association'
+require 'rails_admin/config/fields/factories/serialized'

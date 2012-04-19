@@ -2,7 +2,7 @@ require 'rails_admin/config/fields/group'
 
 module RailsAdmin
   module Config
-    module HasGroups      
+    module HasGroups
       # Accessor for a group
       #
       # If group with given name does not yet exist it will be created. If a
@@ -16,7 +16,7 @@ module RailsAdmin
 
       # Reader for groups that are marked as visible
       def visible_groups
-        parent.groups.map {|f| f.section = self; f.with(bindings) }.select(&:visible).select{|g| g.visible_fields.present?}
+        parent.groups.map {|f| f.section = self; f.with(bindings) }.select(&:visible?).select{|g| g.visible_fields.present?}
       end
     end
   end

@@ -8,13 +8,10 @@ module RailsAdmin
           # Register field type for the type loader
           RailsAdmin::Config::Fields::Types::register(self)
 
-          @column_names = [:password]
-          @view_helper = :password_field
-
-          def self.column_names
-            @column_names
+          register_instance_option :view_helper do
+            :password_field
           end
-          
+
           def parse_input(params)
             params[name] = params[name].presence
           end
@@ -27,7 +24,7 @@ module RailsAdmin
           def value
             ""
           end
-          
+
           register_instance_option :visible do
             self.section.is_a?(RailsAdmin::Config::Sections::Edit)
           end

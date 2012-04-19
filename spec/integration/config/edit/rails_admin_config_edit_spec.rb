@@ -7,12 +7,12 @@ describe "RailsAdmin Config DSL Edit Section" do
   subject { page }
 
   describe "default_value" do
-    
+
     it "should be set for all types of input fields" do
       RailsAdmin.config do |config|
         config.excluded_models = []
         config.model(FieldTest) do
-        
+
           field :string_field do
             default_value 'string_field default_value'
           end
@@ -27,14 +27,18 @@ describe "RailsAdmin Config DSL Edit Section" do
           end
         end
       end
-      
+
       visit new_path(:model_name => "field_test")
-      find_field('field_test[string_field]').value.should == 'string_field default_value'
-      find_field('field_test[text_field]').value.should == 'string_field text_field'
+      # In Rails 3.2.3 behavior of textarea has changed to insert newline after the opening tag,
+      # but Capybara's RackTest driver is not up to this behavior change.
+      # (https://github.com/jnicklas/capybara/issues/677)
+      # So we manually cut off first newline character as a workaround here.
+      find_field('field_test[string_field]').value.gsub(/^\n/, '').should == 'string_field default_value'
+      find_field('field_test[text_field]').value.gsub(/^\n/, '').should == 'string_field text_field'
       find_field('field_test[date_field]').value.should == Date.today.to_s
       has_checked_field?('field_test[boolean_field]').should be_true
     end
-    
+
     it "should set default value for selects" do
       RailsAdmin.config(Team) do
         field :color, :enum do
@@ -145,33 +149,46 @@ describe "RailsAdmin Config DSL Edit Section" do
     end
 
     describe "help" do
+      before(:each) do
+        class HelpTest < Tableless
+          column :name, 'string(50)'
+          column :division, :string
+        end
+        RailsAdmin.config.included_models = [HelpTest]
+      end
+
+      after(:each) do
+        # restore validation setting
+        HelpTest._validators[:name] = []
+        HelpTest.reset_callbacks(:validate)
+      end
 
       it "should show help section if present" do
-        RailsAdmin.config Team do
+        RailsAdmin.config HelpTest do
           edit do
             group :default do
               help "help paragraph to display"
             end
           end
         end
-        visit new_path(:model_name => "team")
+        visit new_path(:model_name => "help_test")
         should have_selector('fieldset>p', :text => "help paragraph to display")
       end
 
       it "should not show help if not present" do
-        RailsAdmin.config Team do
+        RailsAdmin.config HelpTest do
           edit do
             group :default do
               label 'no help'
             end
           end
         end
-        visit new_path(:model_name => "team")
+        visit new_path(:model_name => "help_test")
         should_not have_selector('fieldset>p')
       end
 
       it "should be able to display multiple help if there are multiple sections" do
-        RailsAdmin.config Team do
+        RailsAdmin.config HelpTest do
           edit do
             group :default do
               field :name
@@ -184,71 +201,65 @@ describe "RailsAdmin Config DSL Edit Section" do
             end
           end
         end
-        visit new_path(:model_name => "team")
+        visit new_path(:model_name => "help_test")
         should have_selector("fieldset>p", :text => 'help for default')
         should have_selector("fieldset>p", :text => 'help for other section')
         should have_selector("fieldset>p", :count => 2)
       end
 
-      it "should use the db column size for the maximum length" do
-        visit new_path(:model_name => "team")
-        find("#team_name_field .help-block").should have_content("Length up to 50.")
-      end
-
-# FIXME validates_length_of are leaking in FactoryGirl WTF?
-
       it "should use the :is setting from the validation" do
- #        class Team
- #          validates_length_of :name, :is => 3
- #        end
- #        visit new_path(:model_name => "team")
- #        find("#team_name_field .help-block").should have_content("Length of 3.")
- #        Team._validators[:name] = []
+        HelpTest.class_eval do
+          validates_length_of :name, :is => 3
+        end
+        visit new_path(:model_name => "help_test")
+        find("#help_test_name_field .help-block").should have_content("Length of 3.")
       end
 
-      it "should use the :minimum setting from the validation" do
-        class Team
-          validates_length_of :name, :minimum => 1
+      describe "using ORM column size", :skip_mongoid => true do
+        it "should use the db column size for the maximum length" do
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length up to 50.")
         end
-        visit new_path(:model_name => "team")
-        find("#team_name_field .help-block").should have_content("Length of 1-50.")
-        Team._validators[:name] = []
-      end
 
-      it "should use the :maximum setting from the validation" do
-        class Team
-          validates_length_of :name, :maximum => 49
+        it "should use the :minimum setting from the validation" do
+          HelpTest.class_eval do
+            validates_length_of :name, :minimum => 1
+          end
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length of 1-50.")
         end
-        visit new_path(:model_name => "team")
-        find("#team_name_field .help-block").should have_content("Length up to 49.")
-        Team._validators[:name] = []
-      end
 
-      it "should use the minimum of db column size or :maximum setting from the validation" do
-        class Team
-          validates_length_of :name, :maximum => 51
+        it "should use the :maximum setting from the validation" do
+          HelpTest.class_eval do
+            validates_length_of :name, :maximum => 49
+          end
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length up to 49.")
         end
-        visit new_path(:model_name => "team")
-        find("#team_name_field .help-block").should have_content("Length up to 50.")
-        Team._validators[:name] = []
+
+        it "should use the minimum of db column size or :maximum setting from the validation" do
+          HelpTest.class_eval do
+            validates_length_of :name, :maximum => 51
+          end
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length up to 50.")
+        end
       end
 
       it "should use the :minimum and :maximum from the validation" do
-        class Team
+        HelpTest.class_eval do
           validates_length_of :name, :minimum => 1, :maximum => 49
         end
-        visit new_path(:model_name => "team")
-        find("#team_name_field .help-block").should have_content("Length of 1-49.")
-        Team._validators[:name] = []
+        visit new_path(:model_name => "help_test")
+        find("#help_test_name_field .help-block").should have_content("Length of 1-49.")
       end
 
       it "should use the range from the validation" do
-        class Team
+        HelpTest.class_eval do
           validates_length_of :name, :in => 1..49
         end
-        visit new_path(:model_name => "team")
-        find("#team_name_field .help-block").should have_content("Length of 1-49.")
-        Team._validators[:name] = []
+        visit new_path(:model_name => "help_test")
+        find("#help_test_name_field .help-block").should have_content("Length of 1-49.")
       end
 
     end
@@ -264,15 +275,23 @@ describe "RailsAdmin Config DSL Edit Section" do
             label "Belong's to associations"
             field :division
           end
+          group :basic_info do
+            field :manager
+          end
         end
       end
       visit new_path(:model_name => "team")
       should have_selector("legend", :text => "Basic info")
+      all("legend", :text => "Basic info").tap do |nodes|
+        nodes.count.should == 2
+        nodes.first.visible?.should be_false
+        nodes.last.visible?.should be_true
+      end
       should have_selector("legend", :text => "Belong's to associations")
       should have_selector("label", :text => "Name")
       should have_selector("label", :text => "Logo url")
       should have_selector("label", :text => "Division")
-      should have_selector(".control-group", :count => 3)
+      should have_selector(".control-group", :count => 4)
     end
 
     it "should have accessor for its fields by type" do
@@ -520,7 +539,7 @@ describe "RailsAdmin Config DSL Edit Section" do
       visit new_path(:model_name => "team")
       find("#team_manager_field .help-block").should have_content("Required. Length up to 100. Additional help text for manager field.")
       find("#team_division_id_field .help-block").should have_content("Required")
-      find("#team_name_field .help-block").should have_content("Optional. Length up to 50.")
+      find("#team_name_field .help-block").should_not have_content("Additional help text")
     end
 
     it "should have option to override required status" do
@@ -538,23 +557,22 @@ describe "RailsAdmin Config DSL Edit Section" do
         end
       end
       visit new_path(:model_name => "team")
-      find("#team_manager_field .help-block").should have_content("Optional. Length up to 100.")
+      find("#team_manager_field .help-block").should have_content("Optional")
       find("#team_division_id_field .help-block").should have_content("Optional")
-      find("#team_name_field .help-block").should have_content("Required. Length up to 50.")
+      find("#team_name_field .help-block").should have_content("Required")
     end
   end
 
   describe "input format of" do
 
     before(:each) do
-      RailsAdmin::Config.excluded_models = [RelTest]
       @time = ::Time.now.getutc
     end
 
     after(:each) do
       Time.zone = 'UTC'
     end
-    
+
     describe "a datetime field" do
 
       it "should default to %B %d, %Y %H:%M" do
@@ -596,7 +614,7 @@ describe "RailsAdmin Config DSL Edit Section" do
       end
     end
 
-    describe "a timestamp field" do
+    describe "a timestamp field", :active_record => true do
 
       it "should default to %B %d, %Y %H:%M" do
         visit new_path(:model_name => "field_test")
@@ -741,7 +759,7 @@ describe "RailsAdmin Config DSL Edit Section" do
       end
     end
   end
-  
+
   describe 'bindings' do
     it 'should be present at creation time' do
       RailsAdmin.config do |config|
@@ -754,7 +772,7 @@ describe "RailsAdmin Config DSL Edit Section" do
           end
         end
       end
-      
+
       visit new_path(:model_name => 'category')
       should have_no_css('#category_parent_category_id')
       click_button 'Save'
@@ -764,11 +782,9 @@ describe "RailsAdmin Config DSL Edit Section" do
       should have_content('Category successfully updated')
     end
   end
-  
-  describe 'nested form' do 
 
+  describe 'nested form' do
     it 'should work' do
-      RailsAdmin::Config.excluded_models = [RelTest]
       visit new_path(:model_name => "field_test")
       fill_in "field_test_comment_attributes_content", :with => 'nested comment content'
       click_button "Save"
@@ -783,9 +799,8 @@ describe "RailsAdmin Config DSL Edit Section" do
       @record.nested_field_tests.length.should == 1
       @record.nested_field_tests[0].title.should == 'nested field test title 1 edited'
     end
-    
+
     it 'should set bindings[:object] to nested object' do
-      RailsAdmin::Config.excluded_models = [RelTest]
       RailsAdmin.config(NestedFieldTest) do
         nested do
           field :title do
@@ -800,24 +815,62 @@ describe "RailsAdmin Config DSL Edit Section" do
       visit edit_path(:model_name => "field_test", :id => @record.id)
       find('#field_test_nested_field_tests_attributes_0_title_field').should have_content('NestedFieldTest')
     end
-    
+
     it 'should be desactivable' do
-      RailsAdmin::Config.excluded_models = [RelTest]
-      
       visit new_path(:model_name => "field_test")
-      should have_selector('.add_nested_fields')
+      should have_selector('#field_test_nested_field_tests_attributes_field .add_nested_fields')
       RailsAdmin.config(FieldTest) do
         configure :nested_field_tests do
           nested_form false
         end
       end
       visit new_path(:model_name => "field_test")
-      should have_no_selector('.add_nested_fields')
+      should have_no_selector('#field_test_nested_field_tests_attributes_field .add_nested_fields')
+    end
+
+    describe "with nested_attributes_options given" do
+      before do
+        FieldTest.nested_attributes_options.stub(:[]).with(any_args()).
+          and_return({:allow_destroy=>true, :update_only=>false})
+      end
+
+      it 'should not show add button when :update_only is true' do
+        FieldTest.nested_attributes_options.stub(:[]).with(:nested_field_tests).
+          and_return({:allow_destroy=>true, :update_only=>true})
+        visit new_path(:model_name => "field_test")
+        should have_selector('.toggler')
+        should_not have_selector('#field_test_nested_field_tests_attributes_field .add_nested_fields')
+      end
+
+      it 'should not show destroy button except for newly created when :allow_destroy is false' do
+        @record = FieldTest.create
+        @record.nested_field_tests << NestedFieldTest.create!(:title => 'nested title 1')
+        FieldTest.nested_attributes_options.stub(:[]).with(:nested_field_tests).
+          and_return({:allow_destroy=>false, :update_only=>false})
+        visit edit_path(:model_name => "field_test", :id => @record.id)
+        find('#field_test_nested_field_tests_attributes_0_title').value.should == 'nested title 1'
+        should_not have_selector('form .remove_nested_fields')
+        should have_selector('.fields_blueprint .remove_nested_fields')
+      end
+    end
+  end
+
+  describe 'embedded model', :mongoid => true do
+    it 'should work' do
+      @record = FactoryGirl.create :field_test
+      2.times.each{|i| @record.embeds.create :name => "embed #{i}"}
+      visit edit_path(:model_name => "field_test", :id => @record.id)
+      fill_in "field_test_embeds_attributes_0_name", :with => 'embed 1 edited'
+      page.find('#field_test_embeds_attributes_1__destroy').set('true')
+      click_button "Save"
+      @record.reload
+      @record.embeds.length.should == 1
+      @record.embeds[0].name.should == 'embed 1 edited'
     end
   end
 
 
-  describe "fields which are nullable and have AR validations" do
+  describe "fields which are nullable and have AR validations", :active_record => true do
 
     it "should be required" do
       # draft.notes is nullable and has no validation
@@ -861,7 +914,7 @@ describe "RailsAdmin Config DSL Edit Section" do
         end
       end
       visit new_path(:model_name => "draft")
-      should have_selector("script", :text => /CKEDITOR\.replace.*?draft_notes/)
+      should have_selector('textarea#draft_notes[data-richtext="ckeditor"]')
     end
   end
 
@@ -892,7 +945,7 @@ describe "RailsAdmin Config DSL Edit Section" do
 
   describe "Enum field support" do
     it "should auto-detect enumeration when object responds to '\#{method}_enum'" do
-      class Team
+      Team.class_eval do
         def color_enum
           ["blue", "green", "red"]
         end
@@ -908,8 +961,25 @@ describe "RailsAdmin Config DSL Edit Section" do
       Team.send(:remove_method, :color_enum) # Reset
     end
 
+    it "should auto-detect enumeration when class responds to '::{method}_enum'" do
+      Team.instance_eval do
+        def color_enum
+          ["blue", "green", "red"]
+        end
+      end
+      RailsAdmin.config Team do
+        edit do
+          field :color
+        end
+      end
+      visit new_path(:model_name => "team")
+      should have_selector(".enum_type select")
+      should have_content("green")
+      Team.instance_eval { undef :color_enum } # Reset
+    end
+
     it "should allow configuration of the enum method" do
-      class Team
+      Team.class_eval do
         def color_list
           ["blue", "green", "red"]
         end
@@ -927,8 +997,27 @@ describe "RailsAdmin Config DSL Edit Section" do
       Team.send(:remove_method, :color_list) # Reset
     end
 
+    it "should allow configuration of the enum class method" do
+      Team.instance_eval do
+        def color_list
+          ["blue", "green", "red"]
+        end
+      end
+      RailsAdmin.config Team do
+        edit do
+          field :color, :enum do
+            enum_method :color_list
+          end
+        end
+      end
+      visit new_path(:model_name => "team")
+      should have_selector(".enum_type select")
+      should have_content("green")
+      Team.instance_eval { undef :color_list } # Reset
+    end
+
     it "should allow direct listing of enumeration options and override enum method" do
-      class Team
+      Team.class_eval do
         def color_list
           ["blue", "green", "red"]
         end

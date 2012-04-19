@@ -11,7 +11,7 @@ describe "RailsAdmin Basic List" do
       visit dashboard_path
     end
   end
-  
+
   describe "GET /admin/typo" do
     it "should redirect to dashboard and inform the user the model wasn't found" do
       visit '/admin/whatever'
@@ -19,7 +19,7 @@ describe "RailsAdmin Basic List" do
       find('.alert-error').should have_content("Model 'Whatever' could not be found")
     end
   end
-  
+
   describe "GET /admin/balls/545-typo" do
     it "should redirect to balls index and inform the user the id wasn't found" do
       visit '/admin/ball/545-typo'
@@ -29,7 +29,7 @@ describe "RailsAdmin Basic List" do
   end
 
   describe "GET /admin/player as list" do
-    before(:each) do
+    before do
       21.times { FactoryGirl.create :player } # two pages of players
       visit index_path(:model_name => "player")
     end
@@ -38,52 +38,34 @@ describe "RailsAdmin Basic List" do
       should have_content("List of Players")
       should have_content("Created at")
       should have_content("Updated at")
-    end
 
-    it "shows the show, edit and delete links" do
+      # it "shows the show, edit and delete links" do
       should have_selector("td a", :text => 'Show')
       should have_selector("td a", :text => 'Edit')
       should have_selector("td a", :text => 'Delete')
-    end
 
-    it "has the search box with some prompt text" do
+      # it "has the search box with some prompt text" do
       should have_selector("input[placeholder='Filter']")
-    end
 
-    # https://github.com/sferik/rails_admin/issues/362
-    # test that no link uses the "wildcard route" with the main
-    # controller and list method
-    it "should not use the 'wildcard route'" do
+      # https://github.com/sferik/rails_admin/issues/362
+      # test that no link uses the "wildcard route" with the main
+      # controller and list method
+      # it "should not use the 'wildcard route'" do
       should have_selector("a[href*='all=true']") # make sure we're fully testing pagination
       should have_no_selector("a[href^='/rails_admin/main/list']")
     end
   end
 
-  describe "GET /admin/player with sort" do
-    before(:each) do
-      @players = 2.times.map { FactoryGirl.create :player }
-      visit index_path(:model_name => "player", :sort => "name")
-    end
-
-    it "should be sorted correctly" do
-      2.times { |i| should have_selector("td", :text => /#{@players[i].name}/) }
-    end
-  end
-
-  describe "GET /admin/player with reverse sort" do
-
-    before(:each) do
-      @players = 2.times.map { FactoryGirl.create :player }
-      visit index_path(:model_name => "player", :sort => "name", :sort_reverse => "true")
-    end
-
-    it "should be sorted correctly" do
-      2.times { |i| should have_selector("td", :text => /#{@players.reverse[i].name}/) }
-    end
-  end
-
   describe "GET /admin/player" do
-    before(:each) do
+    before do
+      RailsAdmin.config Player do
+        list do
+          field :name
+          field :team
+          field :injured
+          field :retired
+        end
+      end
       @teams = 2.times.map do
         FactoryGirl.create(:team)
       end
@@ -143,7 +125,7 @@ describe "RailsAdmin Basic List" do
     it "should allow to search a belongs_to attribute over the base table" do
       RailsAdmin.config Player do
         list do
-          field :id
+          field PK_COLUMN
           field :name
           field :team do
             searchable Player => :team_id
@@ -161,7 +143,7 @@ describe "RailsAdmin Basic List" do
     it "should allow to search a belongs_to attribute over the target table" do
       RailsAdmin.config Player do
         list do
-          field :id
+          field PK_COLUMN
           field :name
           field :team do
             searchable Team => :name
@@ -178,7 +160,7 @@ describe "RailsAdmin Basic List" do
     it "should allow to search a belongs_to attribute over the target table with a table name specified as a hash" do
       RailsAdmin.config Player do
         list do
-          field :id
+          field PK_COLUMN
           field :name
           field :team do
             searchable :teams => :name
@@ -195,7 +177,7 @@ describe "RailsAdmin Basic List" do
     it "should allow to search a belongs_to attribute over the target table with a table name specified as a string" do
       RailsAdmin.config Player do
         list do
-          field :id
+          field PK_COLUMN
           field :name
           field :team do
             searchable 'teams.name'
@@ -212,7 +194,7 @@ describe "RailsAdmin Basic List" do
     it "should allow to search a belongs_to attribute over the label method by default" do
       RailsAdmin.config Player do
         list do
-          field :id
+          field PK_COLUMN
           field :name
           field :team
         end
@@ -227,7 +209,7 @@ describe "RailsAdmin Basic List" do
     it "should allow to search a belongs_to attribute over the target table when an attribute is specified" do
       RailsAdmin.config Player do
         list do
-          field :id
+          field PK_COLUMN
           field :name
           field :team do
             searchable :name
@@ -244,20 +226,20 @@ describe "RailsAdmin Basic List" do
     it "should allow to search over more than one attribute" do
       RailsAdmin.config Player do
         list do
-          field :id
+          field PK_COLUMN
           field :name
           field :team do
             searchable [:name, {Player => :team_id}]
           end
         end
       end
-      visit index_path(:model_name => "player", :f => {:team => {"1" => {:v => @teams.first.name}, "2" => {:v => @teams.first.id}}})
+      visit index_path(:model_name => "player", :f => {:team => {"1" => {:v => @teams.first.name}, "2" => {:v => @teams.first.id, :o => 'is'}}})
       should have_content(@players[0].name)
       should have_content(@players[1].name)
       should have_no_content(@players[2].name)
       should have_no_content(@players[3].name)
       # same with a different id
-      visit index_path(:model_name => "player", :f => {:team => {"1" => {:v => @teams.first.name}, "2" => {:v => @teams.last.id}}})
+      visit index_path(:model_name => "player", :f => {:team => {"1" => {:v => @teams.first.name}, "2" => {:v => @teams.last.id, :o => 'is'}}})
       should have_no_content(@players[0].name)
       should have_no_content(@players[1].name)
       should have_no_content(@players[2].name)
@@ -272,7 +254,8 @@ describe "RailsAdmin Basic List" do
       end
 
       visit index_path(:model_name => "player")
-      should have_content("$.filters.append('Name', 'name', 'string', '', '', '', false, '1');$.filters.append('Team', 'team', 'belongs_to_association', '', '', '', false, '2');")
+      should have_content(%{$.filters.append("Name", "name", "string", null, null, "", 1);})
+      should have_content(%{$.filters.append("Team", "team", "belongs_to_association", null, null, "", 2);})
     end
   end
 

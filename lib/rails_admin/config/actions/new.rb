@@ -3,21 +3,21 @@ module RailsAdmin
     module Actions
       class New < RailsAdmin::Config::Actions::Base
         RailsAdmin::Config::Actions.register(self)
-        
+
         register_instance_option :collection do
           true
         end
-        
+
         register_instance_option :http_methods do
           [:get, :post] # NEW / CREATE
         end
-        
+
         register_instance_option :controller do
-          
+
           Proc.new do
-            
+
             if request.get? # NEW
-              
+
               @object = @abstract_model.new
               @authorization_adapter && @authorization_adapter.attributes_for(:new, @abstract_model).each do |name, value|
                 @object.send("#{name}=", value)
@@ -29,18 +29,18 @@ module RailsAdmin
                 format.html { render @action.template_name }
                 format.js   { render @action.template_name, :layout => false }
               end
-              
+
             elsif request.post? # CREATE
-              
+
               @modified_assoc = []
               @object = @abstract_model.new
-              @attributes = get_attributes              
-              @model_config.create.fields.each {|f| f.parse_input(@attributes) if f.respond_to?(:parse_input) }
+              sanitize_params_for! :create
+              
+              @object.set_attributes(params[@abstract_model.param_key], _attr_accessible_role)
               @authorization_adapter && @authorization_adapter.attributes_for(:create, @abstract_model).each do |name, value|
                 @object.send("#{name}=", value)
               end
-              @object.set_attributes(@attributes, _attr_accessible_role)
-
+              
               if @object.save
                 @auditing_adapter && @auditing_adapter.create_object("Created #{@model_config.with(:object => @object).object_label}", @object, @abstract_model, _current_user)
                 respond_to do |format|
@@ -50,14 +50,14 @@ module RailsAdmin
               else
                 handle_save_error
               end
-              
+
             end
           end
         end
-      
+
         register_instance_option :link_icon do
-          'icon-pencil'
-        end        
+          'icon-plus'
+        end
       end
     end
   end

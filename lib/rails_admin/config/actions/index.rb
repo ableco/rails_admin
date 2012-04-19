@@ -3,19 +3,19 @@ module RailsAdmin
     module Actions
       class Index < RailsAdmin::Config::Actions::Base
         RailsAdmin::Config::Actions.register(self)
-        
+
         register_instance_option :collection do
           true
         end
-        
+
         register_instance_option :http_methods do
           [:get, :post]
         end
-        
+
         register_instance_option :route_fragment do
           ''
         end
-        
+
         register_instance_option :breadcrumb_parent do
           parent_model = bindings[:abstract_model].try(:config).try(:parent)
           if am = parent_model && RailsAdmin.config(parent_model).try(:abstract_model)
@@ -24,20 +24,22 @@ module RailsAdmin
             [:dashboard]
           end
         end
-        
+
         register_instance_option :controller do
           Proc.new do
             @objects ||= list_entries
 
             respond_to do |format|
-              
+
               format.html do
-                render @action.template_name, :layout => !request.xhr?, :status => (flash[:error].present? ? :not_found : 200)
+                render @action.template_name, :status => (flash[:error].present? ? :not_found : 200)
               end
-              
+
               format.json do
                 output = if params[:compact]
-                  @objects.map{ |o| { :id => o.id, :label => o.send(@model_config.object_label_method) } }
+                  primary_key_method = @association ? @association.associated_primary_key : @model_config.abstract_model.primary_key
+                  label_method = @model_config.object_label_method
+                  @objects.map{ |o| { :id => o.send(primary_key_method), :label => o.send(label_method) } }
                 else
                   @objects.to_json(@schema)
                 end
@@ -47,7 +49,7 @@ module RailsAdmin
                   render :json => output
                 end
               end
-              
+
               format.xml do
                 output = @objects.to_xml(@schema)
                 if params[:send_data]
@@ -56,7 +58,7 @@ module RailsAdmin
                   render :xml => output
                 end
               end
-              
+
               format.csv do
                 header, encoding, output = CSVConverter.new(@objects, @schema).to_csv(params[:csv_options])
                 if params[:send_data]
@@ -67,16 +69,16 @@ module RailsAdmin
                   render :text => output
                 end
               end
-              
+
             end
-            
+
           end
         end
-      
-      
+
+
         register_instance_option :link_icon do
           'icon-th-list'
-        end        
+        end
       end
     end
   end

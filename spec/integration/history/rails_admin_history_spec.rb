@@ -1,7 +1,6 @@
 require 'spec_helper'
-require 'rails_admin/extensions/history/history'
 
-describe "RailsAdmin History" do
+describe "RailsAdmin History", :active_record => true do
   describe "model history fetch" do
     before :each do
       RailsAdmin::History.delete_all
@@ -18,7 +17,7 @@ describe "RailsAdmin History" do
       histories.total_count.should == 30
       histories.count.should == 20
     end
-    
+
     it "should respect RailsAdmin::Config.default_items_per_page" do
       RailsAdmin.config.default_items_per_page = 15
       histories = RailsAdmin::History.history_for_model @model, nil, false, false, false, nil
@@ -51,7 +50,7 @@ describe "RailsAdmin History" do
             RailsAdmin::History.create_history_item "change #{i}", player, @model, nil
           end
         end
-        
+
         it 'should get latest ones' do
           RailsAdmin::History.latest.count.should == 100
         end
