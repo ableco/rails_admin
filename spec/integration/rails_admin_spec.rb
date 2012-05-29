@@ -41,7 +41,8 @@ describe "RailsAdmin" do
   end
 
   describe 'hidden fields with default values' do
-    it "should show up with default value, hidden" do
+    
+    before (:each) do
       RailsAdmin.config Player do
         include_all_fields
         edit do
@@ -52,10 +53,20 @@ describe "RailsAdmin" do
           end
         end
       end
-
+    end
+    
+    it "should show up with default value, hidden" do
       visit new_path(:model_name => "player")
       should have_selector("#player_name[type=hidden][value='username@example.com']")
       should_not have_selector("#player_name[type=hidden][value='toto@example.com']")
+    end
+    
+    it "should not show label" do
+      should_not have_selector("label", :text => "Name")
+    end
+    
+    it "should not show help block" do
+      should_not have_xpath("id('player_name')/../p[@class='help-block']")
     end
   end
 
@@ -110,4 +121,22 @@ describe "RailsAdmin" do
     end
   end
 
+  describe "secondary navigation" do
+    it "should have Gravatar image" do
+      visit dashboard_path
+      should have_selector("ul.nav.pull-right li img")
+    end
+
+    it "should not show Gravatar when user doesn't have email method" do
+      User.any_instance.stub(:respond_to?).with(:email).and_return(false)
+      visit dashboard_path
+      should_not have_selector("ul.nav.pull-right li img")
+    end
+
+    it "should not cause error when email is nil" do
+      User.any_instance.stub(:email).and_return(nil)
+      visit dashboard_path
+      should have_selector("body.rails_admin")
+    end
+  end
 end

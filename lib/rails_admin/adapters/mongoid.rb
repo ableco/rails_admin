@@ -15,8 +15,13 @@ module RailsAdmin
       def get(id)
         begin
           AbstractObject.new(model.find(id))
-        rescue BSON::InvalidObjectId, ::Mongoid::Errors::DocumentNotFound
-          nil
+        rescue => e
+          if ['BSON::InvalidObjectId', 'Mongoid::Errors::DocumentNotFound',
+              'Mongoid::Errors::InvalidFind', 'Moped::Errors::InvalidObjectId'].include? e.class.to_s
+            nil
+          else
+            raise e
+          end
         end
       end
 
@@ -35,11 +40,13 @@ module RailsAdmin
         scope = scope.any_in(:_id => options[:bulk_ids]) if options[:bulk_ids]
         scope = scope.where(query_conditions(options[:query])) if options[:query]
         scope = scope.where(filter_conditions(options[:filters])) if options[:filters]
-        scope = scope.page(options[:page]).per(options[:per]) if options[:page] && options[:per]
+        if options[:page] && options[:per]
+          scope = scope.send(Kaminari.config.page_method_name, options[:page]).per(options[:per])
+        end
         scope = sort_by(options, scope) if options[:sort]
         scope
       end
-      
+
       def count(options = {},scope=nil)
         all(options.merge({:limit => false, :page => false}), scope).count
       end
@@ -80,6 +87,7 @@ module RailsAdmin
             "BigDecimal"     => { :type => :decimal },
             "Boolean"        => { :type => :boolean },
             "BSON::ObjectId" => { :type => :bson_object_id, :serial? => (name == primary_key) },
+            "Moped::BSON::ObjectId" => { :type => :bson_object_id, :serial? => (name == primary_key) },
             "Date"           => { :type => :date },
             "DateTime"       => { :type => :datetime },
             "Float"          => { :type => :float },
@@ -116,7 +124,7 @@ module RailsAdmin
       end
 
       def table_name
-        model.collection.name
+        model.collection_name.to_s
       end
 
       def serialized_attributes
@@ -141,7 +149,7 @@ module RailsAdmin
         fields.each do |field|
           conditions_per_collection = {}
           field.searchable_columns.flatten.each do |column_infos|
-            collection_name, column_name = column_infos[:column].split('.')
+            collection_name, column_name = parse_collection_name(column_infos[:column])
             statement = build_statement(column_name, column_infos[:type], query, field.search_operator)
             if statement
               conditions_per_collection[collection_name] ||= []
@@ -169,7 +177,7 @@ module RailsAdmin
             field = fields.find{|f| f.name.to_s == field_name}
             next unless field
             field.searchable_columns.each do |column_infos|
-              collection_name, column_name = column_infos[:column].split('.')
+              collection_name, column_name = parse_collection_name(column_infos[:column])
               statement = build_statement(column_name, column_infos[:type], filter_dump[:v], (filter_dump[:o] || 'default'))
               if statement
                 conditions_per_collection[collection_name] ||= []
@@ -259,7 +267,7 @@ module RailsAdmin
           return if value.blank?
           { column => { "$in" => Array.wrap(value) } }
         when :belongs_to_association, :bson_object_id
-          object_id = (BSON::ObjectId(value) rescue nil)
+          object_id = (BSON::ObjectId.from_string(value) rescue nil)
           { column => object_id } if object_id
         end
       end
@@ -317,7 +325,7 @@ module RailsAdmin
           association.foreign_key.to_sym rescue nil
         end
       end
-      
+
       def association_type_lookup(macro)
         case macro.to_sym
         when :belongs_to, :referenced_in, :embedded_in
@@ -343,6 +351,15 @@ module RailsAdmin
           shortest.options[:maximum]
         else
           false
+        end
+      end
+
+      def parse_collection_name(column)
+        collection_name, column_name = column.split('.')
+        if [:embeds_one, :embeds_many].include?(model.associations[collection_name].try(:macro).try(:to_sym))
+          [table_name, column]
+        else
+          [collection_name, column_name]
         end
       end
 

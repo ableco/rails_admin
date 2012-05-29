@@ -67,7 +67,7 @@ describe RailsAdmin::MainController do
     end
 
     it "scopes associated collection records according to bindings" do
-      @team.revenue = 3
+      @team.revenue = BigDecimal.new('3')
       @team.save
 
       @players = 5.times.map do
@@ -107,7 +107,14 @@ describe RailsAdmin::MainController do
         end
       end
       controller.list_entries.length.should == @players.size
+    end
 
+    it "orders associated collection records by desc" do
+      @players = 3.times.map do
+        FactoryGirl.create :player
+      end
+
+      controller.list_entries.to_a.first.should == @players.last
     end
   end
 

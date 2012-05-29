@@ -238,7 +238,24 @@ describe 'RailsAdmin::Adapters::Mongoid', :mongoid => true do
       lambda{ RailsAdmin::AbstractModel.new(MongoEmbedsMany).associations }.should raise_error(RuntimeError,
         "Embbeded association without accepts_nested_attributes_for can't be handled by RailsAdmin,\nbecause embedded model doesn't have top-level access.\nPlease add `accepts_nested_attributes_for :mongo_embeddeds' line to `MongoEmbedsMany' model.\n"
       )
-     end
+    end
+
+    it "should work with inherited embeds_many model" do
+      class MongoEmbedsParent
+        include Mongoid::Document
+        embeds_many :mongo_embeddeds
+        accepts_nested_attributes_for :mongo_embeddeds
+      end
+
+      class MongoEmbedded
+        include Mongoid::Document
+        embedded_in :mongo_embeds_many
+      end
+
+      class MongoEmbedsChild < MongoEmbedsParent; end
+
+      lambda{ RailsAdmin::AbstractModel.new(MongoEmbedsChild).associations }.should_not raise_error
+    end
   end
 
   describe "#properties" do
@@ -528,6 +545,29 @@ describe 'RailsAdmin::Adapters::Mongoid', :mongoid => true do
 
       it "supports filtering" do
         @abstract_model.all(:filters => {"fans" => {"0000" => {:o=>"is", :v=>'foobar'}}}).to_a.should == @teams[1..1]
+      end
+    end
+
+    describe "whose type is embedded has_many" do
+      before do
+        RailsAdmin.config FieldTest do
+          field :embeds do
+            queryable true
+            searchable :all
+          end
+        end
+        @field_tests = FactoryGirl.create_list(:field_test, 3)
+        @field_tests[0].embeds.create :name => 'foo'
+        @field_tests[1].embeds.create :name => 'bar'
+        @abstract_model = RailsAdmin::AbstractModel.new('FieldTest')
+      end
+
+      it "supports querying" do
+        @abstract_model.all(:query => 'bar').to_a.should == @field_tests[1..1]
+      end
+
+      it "supports filtering" do
+        @abstract_model.all(:filters => {"embeds" => {"0000" => {:o=>"is", :v=>'bar'}}}).to_a.should == @field_tests[1..1]
       end
     end
   end
