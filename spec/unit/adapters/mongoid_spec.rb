@@ -397,6 +397,27 @@ describe 'RailsAdmin::Adapters::Mongoid', :mongoid => true do
           :length => 255 }
       ]
     end
+
+    it "detects validation length properly" do
+      class LengthValiated
+        include Mongoid::Document
+        field :text, :type => String
+        validates :text, :length => {:maximum => 50}
+      end
+      RailsAdmin::AbstractModel.new('LengthValiated').send(:length_validation_lookup, :text).should == 50
+    end
+
+    it "should not cause problem with custom validators" do
+      class MyCustomValidator < ActiveModel::Validator
+        def validate(r); end
+      end
+      class CustomValiated
+        include Mongoid::Document
+        field :text, :type => String
+        validates_with MyCustomValidator
+      end
+      lambda{ RailsAdmin::AbstractModel.new('CustomValiated').send(:length_validation_lookup, :text) }.should_not raise_error
+    end
   end
 
   describe "data access method" do
@@ -417,8 +438,8 @@ describe 'RailsAdmin::Adapters::Mongoid', :mongoid => true do
       @abstract_model.get('4f4f0824dcf2315093000000').should be_nil
     end
 
-    it "#first returns first item" do
-      @abstract_model.first.should == @players.first
+    it "#first returns a player" do
+      @players.should include @abstract_model.first
     end
 
     it "#count returns count of items" do
@@ -444,7 +465,7 @@ describe 'RailsAdmin::Adapters::Mongoid', :mongoid => true do
       end
 
       it "supports limiting" do
-        @abstract_model.all(:limit => 2).to_a.count.should == 2
+        @abstract_model.all(:limit => 2).to_a.should have(2).items
       end
 
       it "supports retrieval by bulk_ids" do

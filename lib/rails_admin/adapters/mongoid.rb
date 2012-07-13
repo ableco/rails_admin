@@ -7,6 +7,7 @@ module RailsAdmin
     module Mongoid
       STRING_TYPE_COLUMN_NAMES = [:name, :title, :subject]
       DISABLED_COLUMN_TYPES = ['Range']
+      ObjectId = (::Mongoid::VERSION >= '3' ? ::Moped::BSON::ObjectId : ::BSON::ObjectId)
 
       def new(params = {})
         AbstractObject.new(model.new)
@@ -35,7 +36,7 @@ module RailsAdmin
 
       def all(options = {},scope=nil)
         scope ||= self.scoped
-        scope = scope.includes(options[:include]) if options[:include]
+        scope = scope.includes(*options[:include]) if options[:include]
         scope = scope.limit(options[:limit]) if options[:limit]
         scope = scope.any_in(:_id => options[:bulk_ids]) if options[:bulk_ids]
         scope = scope.where(query_conditions(options[:query])) if options[:query]
@@ -139,6 +140,10 @@ module RailsAdmin
 
       def embedded?
         @embedded ||= !!model.associations.values.find{|a| a.macro.to_sym == :embedded_in }
+      end
+
+      def object_id_from_string(str)
+        ObjectId.from_string(str)
       end
 
       private
@@ -267,7 +272,7 @@ module RailsAdmin
           return if value.blank?
           { column => { "$in" => Array.wrap(value) } }
         when :belongs_to_association, :bson_object_id
-          object_id = (BSON::ObjectId.from_string(value) rescue nil)
+          object_id = (object_id_from_string(value) rescue nil)
           { column => object_id } if object_id
         end
       end
@@ -343,7 +348,8 @@ module RailsAdmin
 
       def length_validation_lookup(name)
         shortest = model.validators.select do |validator|
-          validator.attributes.include?(name.to_sym) &&
+          validator.respond_to?(:attributes) &&
+            validator.attributes.include?(name.to_sym) &&
             validator.kind == :length &&
             validator.options[:maximum]
         end.min{|a, b| a.options[:maximum] <=> b.options[:maximum] }

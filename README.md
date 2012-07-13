@@ -58,21 +58,42 @@ And then run:
 
 This generator will install RailsAdmin and [Devise](https://github.com/plataformatec/devise) if you
 don't already have it installed. [Devise](https://github.com/plataformatec/devise) is strongly
-recommended to protect your data from anonymous users.
+recommended to protect your data from anonymous users. Note: If you do not already have [Devise](https://github.com/plataformatec/devise) 
+installed, make sure you remove the registerable module from the generated user model.  
+
+
 It will modify your `config/routes.rb`, adding:
 
 ```ruby
 mount RailsAdmin::Engine => '/admin', :as => 'rails_admin' # Feel free to change '/admin' to any namespace you need.
 ```
 
+Note: Your RailsAdmin namespace cannot match your Devise model name, or you will get an infinite redirect error.
+The following will generate infinite redirects.
+
+```ruby
+mount RailsAdmin::Engine => '/admin', :as => 'rails_admin'
+devise_for :admins
+```
+
+Consider renaming your RailsAdmin namespace:
+
+```ruby
+mount RailsAdmin::Engine => '/rails_admin', :as => 'rails_admin'
+devise_for :admins
+```
+
+See [#715](https://github.com/sferik/rails_admin/issues/715) for more details.
+
 It will also add an intializer that will help you getting started. (head for config/initializers/rails_admin.rb)
+
 
 Finally run:
 
     $ bundle exec rake db:migrate
 
 Optionally, you may wish to set up [Cancan](https://github.com/ryanb/cancan),
-[PaperTrail](https://github.com/airblade/paper_trail), [CKeditor](https://github.com/galetahub/ckeditor)
+[PaperTrail](https://github.com/airblade/paper_trail), [CKeditor](https://github.com/galetahub/ckeditor), [CodeMirror](https://github.com/fixlr/codemirror-rails)
 
 More on that in the [Wiki](https://github.com/sferik/rails_admin/wiki)
 
