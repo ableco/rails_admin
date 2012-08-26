@@ -154,13 +154,48 @@ describe "RailsAdmin Config DSL Edit Section" do
           column :name, 'string(50)'
           column :division, :string
         end
-        RailsAdmin.config.included_models = [HelpTest]
+        RailsAdmin.config.included_models = [HelpTest, Team]
       end
 
       after(:each) do
         # restore validation setting
         HelpTest._validators[:name] = []
         HelpTest.reset_callbacks(:validate)
+      end
+
+      context "using mongoid", :skip_active_record => true do
+        it "should use the db column size for the maximum length" do
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length up to 255.")
+        end
+
+        it "should return nil for the maximum length" do
+          visit new_path(:model_name => "team")
+          find("#team_custom_field_field .help-block").should_not have_content("Length")
+        end
+      end
+
+      context "using active_record", :skip_mongoid => true do
+        it "should use the db column size for the maximum length" do
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length up to 50.")
+        end
+
+        it "should use the :minimum setting from the validation" do
+          HelpTest.class_eval do
+            validates_length_of :name, :minimum => 1
+          end
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length of 1-50.")
+        end
+
+        it "should use the minimum of db column size or :maximum setting from the validation" do
+          HelpTest.class_eval do
+            validates_length_of :name, :maximum => 51
+          end
+          visit new_path(:model_name => "help_test")
+          find("#help_test_name_field .help-block").should have_content("Length up to 50.")
+        end
       end
 
       it "should show help section if present" do
@@ -215,35 +250,12 @@ describe "RailsAdmin Config DSL Edit Section" do
         find("#help_test_name_field .help-block").should have_content("Length of 3.")
       end
 
-      describe "using ORM column size", :skip_mongoid => true do
-        it "should use the db column size for the maximum length" do
-          visit new_path(:model_name => "help_test")
-          find("#help_test_name_field .help-block").should have_content("Length up to 50.")
+      it "should use the :maximum setting from the validation" do
+        HelpTest.class_eval do
+          validates_length_of :name, :maximum => 49
         end
-
-        it "should use the :minimum setting from the validation" do
-          HelpTest.class_eval do
-            validates_length_of :name, :minimum => 1
-          end
-          visit new_path(:model_name => "help_test")
-          find("#help_test_name_field .help-block").should have_content("Length of 1-50.")
-        end
-
-        it "should use the :maximum setting from the validation" do
-          HelpTest.class_eval do
-            validates_length_of :name, :maximum => 49
-          end
-          visit new_path(:model_name => "help_test")
-          find("#help_test_name_field .help-block").should have_content("Length up to 49.")
-        end
-
-        it "should use the minimum of db column size or :maximum setting from the validation" do
-          HelpTest.class_eval do
-            validates_length_of :name, :maximum => 51
-          end
-          visit new_path(:model_name => "help_test")
-          find("#help_test_name_field .help-block").should have_content("Length up to 50.")
-        end
+        visit new_path(:model_name => "help_test")
+        find("#help_test_name_field .help-block").should have_content("Length up to 49.")
       end
 
       it "should use the :minimum and :maximum from the validation" do
@@ -261,7 +273,6 @@ describe "RailsAdmin Config DSL Edit Section" do
         visit new_path(:model_name => "help_test")
         find("#help_test_name_field .help-block").should have_content("Length of 1-49.")
       end
-
     end
 
     it "should have accessor for its fields" do
@@ -317,6 +328,12 @@ describe "RailsAdmin Config DSL Edit Section" do
       should have_selector("label", :text => "Division")
       should have_selector("label", :text => "Manager (STRING)")
       should have_selector("label", :text => "Ballpark (STRING)")
+    end
+
+    it 'should be required' do
+      visit new_path(:model_name => "team")
+      should have_selector '.required#team_manager_field'
+      find('.required#team_manager_field input#team_manager')['required'].should_not be_blank
     end
   end
 
@@ -853,6 +870,14 @@ describe "RailsAdmin Config DSL Edit Section" do
         should have_selector('.fields_blueprint .remove_nested_fields')
       end
     end
+
+    describe "when a field which have the same name of nested_in field's" do
+      it "should not hide fields which is not associated with nesting parent field's model" do
+        visit new_path(:model_name => "field_test")
+        should_not have_selector('select#field_test_nested_field_tests_attributes_new_nested_field_tests_field_test_id')
+        should have_selector('select#field_test_nested_field_tests_attributes_new_nested_field_tests_another_field_test_id')
+      end
+    end
   end
 
   describe 'embedded model', :mongoid => true do
@@ -868,7 +893,6 @@ describe "RailsAdmin Config DSL Edit Section" do
       @record.embeds[0].name.should == 'embed 1 edited'
     end
   end
-
 
   describe "fields which are nullable and have AR validations", :active_record => true do
 
@@ -938,6 +962,26 @@ describe "RailsAdmin Config DSL Edit Section" do
     end
   end
 
+  describe "bootstrap_wysihtml5 Support" do
+
+    it "should start with bootstrap_wysihtml5 disabled" do
+       field = RailsAdmin::config("Draft").edit.fields.find{|f| f.name == :notes}
+       field.bootstrap_wysihtml5.should be false
+    end
+
+    it "should add Javascript to enable bootstrap_wysihtml5" do
+      RailsAdmin.config Draft do
+        edit do
+          field :notes do
+            bootstrap_wysihtml5 true
+          end
+        end
+      end
+      visit new_path(:model_name => "draft")
+      should have_selector('textarea#draft_notes[data-richtext="bootstrap-wysihtml5"]')
+    end
+  end
+
   describe "Paperclip Support" do
 
     it "should show a file upload field" do
@@ -964,101 +1008,185 @@ describe "RailsAdmin Config DSL Edit Section" do
   end
 
   describe "Enum field support" do
-    it "should auto-detect enumeration when object responds to '\#{method}_enum'" do
-      Team.class_eval do
-        def color_enum
-          ["blue", "green", "red"]
-        end
-      end
-      RailsAdmin.config Team do
-        edit do
-          field :color
-        end
-      end
-      visit new_path(:model_name => "team")
-      should have_selector(".enum_type select")
-      should have_content("green")
-      Team.send(:remove_method, :color_enum) # Reset
-    end
-
-    it "should auto-detect enumeration when class responds to '::{method}_enum'" do
-      Team.instance_eval do
-        def color_enum
-          ["blue", "green", "red"]
-        end
-      end
-      RailsAdmin.config Team do
-        edit do
-          field :color
-        end
-      end
-      visit new_path(:model_name => "team")
-      should have_selector(".enum_type select")
-      should have_content("green")
-      Team.instance_eval { undef :color_enum } # Reset
-    end
-
-    it "should allow configuration of the enum method" do
-      Team.class_eval do
-        def color_list
-          ["blue", "green", "red"]
-        end
-      end
-      RailsAdmin.config Team do
-        edit do
-          field :color, :enum do
-            enum_method :color_list
+    describe "when object responds to '\#{method}_enum'" do
+      before do
+        Team.class_eval do
+          def color_enum
+            ["blue", "green", "red"]
           end
         end
-      end
-      visit new_path(:model_name => "team")
-      should have_selector(".enum_type select")
-      should have_content("green")
-      Team.send(:remove_method, :color_list) # Reset
-    end
-
-    it "should allow configuration of the enum class method" do
-      Team.instance_eval do
-        def color_list
-          ["blue", "green", "red"]
-        end
-      end
-      RailsAdmin.config Team do
-        edit do
-          field :color, :enum do
-            enum_method :color_list
+        RailsAdmin.config Team do
+          edit do
+            field :color
           end
         end
+        visit new_path(:model_name => "team")
       end
-      visit new_path(:model_name => "team")
-      should have_selector(".enum_type select")
-      should have_content("green")
-      Team.instance_eval { undef :color_list } # Reset
+
+      after do
+        Team.send(:remove_method, :color_enum)
+      end
+
+      it "should auto-detect enumeration" do
+        should have_selector(".enum_type select")
+        should_not have_selector(".enum_type select[multiple]")
+        should have_content("green")
+      end
     end
 
-    it "should allow direct listing of enumeration options and override enum method" do
-      Team.class_eval do
-        def color_list
-          ["blue", "green", "red"]
+    describe "when class responds to '\#{method}_enum'" do
+      before do
+        Team.instance_eval do
+          def color_enum
+            ["blue", "green", "red"]
+          end
         end
+        RailsAdmin.config Team do
+          edit do
+            field :color
+          end
+        end
+        visit new_path(:model_name => "team")
       end
-      RailsAdmin.config Team do
-        edit do
-          field :color, :enum do
-            enum_method :color_list
-            enum do
-              ["yellow", "black"]
+
+      after do
+        Team.instance_eval { undef :color_enum }
+      end
+
+      it "should auto-detect enumeration" do
+        should have_selector(".enum_type select")
+        should have_content("green")
+      end
+    end
+
+    describe "the enum instance method" do
+      before do
+        Team.class_eval do
+          def color_list
+            ["blue", "green", "red"]
+          end
+        end
+        RailsAdmin.config Team do
+          edit do
+            field :color, :enum do
+              enum_method :color_list
             end
           end
         end
+        visit new_path(:model_name => "team")
       end
-      visit new_path(:model_name => "team")
-      should have_selector(".enum_type select")
-      should have_no_content("green")
-      should have_content("yellow")
-      Team.send(:remove_method, :color_list) # Reset
+
+      after do
+        Team.send(:remove_method, :color_list)
+      end
+
+      it "should allow configuration" do
+        should have_selector(".enum_type select")
+        should have_content("green")
+      end
     end
 
+    describe "the enum class method" do
+      before do
+        Team.instance_eval do
+          def color_list
+            ["blue", "green", "red"]
+          end
+        end
+        RailsAdmin.config Team do
+          edit do
+            field :color, :enum do
+              enum_method :color_list
+            end
+          end
+        end
+        visit new_path(:model_name => "team")
+      end
+
+      after do
+        Team.instance_eval { undef :color_list }
+      end
+
+      it "should allow configuration" do
+        should have_selector(".enum_type select")
+        should have_content("green")
+      end
+    end
+
+    describe "when overriding enum configuration" do
+      before do
+        Team.class_eval do
+          def color_list
+            ["blue", "green", "red"]
+          end
+        end
+        RailsAdmin.config Team do
+          edit do
+            field :color, :enum do
+              enum_method :color_list
+              enum do
+                ["yellow", "black"]
+              end
+            end
+          end
+        end
+        visit new_path(:model_name => "team")
+      end
+
+      after do
+        Team.send(:remove_method, :color_list)
+      end
+
+      it "should allow direct listing of enumeration options and override enum method" do
+        should have_selector(".enum_type select")
+        should have_no_content("green")
+        should have_content("yellow")
+      end
+    end
+
+    describe "when serialize is enabled in ActiveRecord model", :active_record => true do
+      before do
+        Team.instance_eval do
+          serialize :color
+          def color_enum
+            ["blue", "green", "red"]
+          end
+        end
+        visit new_path(:model_name => "team")
+      end
+
+      after do
+        Team.serialized_attributes.clear
+        Team.instance_eval { undef :color_enum }
+      end
+
+      it "should make enumeration multi-selectable" do
+        should have_selector(".enum_type select[multiple]")
+      end
+    end
+
+    describe "when serialize is enabled in Mongoid model", :mongoid => true do
+      before do
+        Team.instance_eval do
+          field :color, :type => Array
+          def color_enum
+            ["blue", "green", "red"]
+          end
+        end
+        visit new_path(:model_name => "team")
+      end
+
+      after do
+        Team.instance_eval do
+          field :color, :type => String
+          undef :color_enum
+        end
+      end
+
+      it "should make enumeration multi-selectable" do
+        should have_selector(".enum_type select[multiple]")
+      end
+    end
   end
 
   describe "ColorPicker Support" do

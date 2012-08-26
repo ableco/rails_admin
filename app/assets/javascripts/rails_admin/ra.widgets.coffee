@@ -26,7 +26,10 @@ $(document).live 'rails_admin.dom_ready', ->
     # enumeration
 
     $('form [data-enumeration]').each ->
-      $(this).filteringSelect $(this).data('options')
+      if $(this).is('[multiple]')
+        $(this).filteringMultiselect $(this).data('options')
+      else
+        $(this).filteringSelect $(this).data('options')
 
     # fileupload
 
@@ -34,6 +37,24 @@ $(document).live 'rails_admin.dom_ready', ->
       input = this
       $(this).find(".delete input[type='checkbox']").live 'click', ->
         $(input).children('.toggle').toggle('slow')
+
+    # fileupload-preview
+
+    $('form [data-fileupload]').change ->
+      input = this
+      image_container = $("#" + input.id).parent().children(".preview")
+      unless image_container.length
+        image_container = $("#" + input.id).parent().prepend($('<img />').addClass('preview')).find('img.preview')
+        image_container.parent().find('img:not(.preview)').hide()
+      ext = $("#" + input.id).val().split('.').pop().toLowerCase()
+      if input.files and input.files[0] and $.inArray(ext, ['gif','png','jpg','jpeg','bmp']) != -1
+        reader = new FileReader()
+        reader.onload = (e) ->
+          image_container.attr "src", e.target.result
+        reader.readAsDataURL input.files[0]
+        image_container.show()
+      else
+        image_container.hide()
 
     # filtering-multiselect
 
@@ -156,7 +177,7 @@ $(document).live 'rails_admin.dom_ready', ->
           CodeMirror.fromTextArea(textarea,{mode:options['options']['mode'],theme:options['options']['theme']})
           $(textarea).addClass('codemirrored')
 
-    array = $('form [data-richtext=codemirror]').not('.codemirrored')      
+    array = $('form [data-richtext=codemirror]').not('.codemirrored')
     if array.length
       @array = array
       if not window.CodeMirror
@@ -167,3 +188,21 @@ $(document).live 'rails_admin.dom_ready', ->
       else
         goCodeMirrors(@array)
 
+    # bootstrap_wysihtml5
+
+    goBootstrapWysihtml5s = (array) =>
+      array.each ->
+        $(@).addClass('bootstrap-wysihtml5ed')
+        $(@).closest('.controls').addClass('well')
+        $(@).wysihtml5()
+
+    array = $('form [data-richtext=bootstrap-wysihtml5]').not('.bootstrap-wysihtml5ed')
+    if array.length
+      @array = array
+      if not window.wysihtml5
+        options = $(array[0]).data('options')
+        $('head').append('<link href="' + options['csspath'] + '" rel="stylesheet" media="all" type="text\/css">')
+        $.getScript options['jspath'], (script, textStatus, jqXHR) =>
+          goBootstrapWysihtml5s(@array)
+      else
+        goBootstrapWysihtml5s(@array)
