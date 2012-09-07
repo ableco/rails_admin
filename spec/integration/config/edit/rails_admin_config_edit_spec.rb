@@ -624,6 +624,16 @@ describe "RailsAdmin Config DSL Edit Section" do
         @record = RailsAdmin::AbstractModel.new("FieldTest").first
         @record.datetime_field.to_s(:rfc822).should eql(@time.to_s(:rfc822))
       end
+
+      it "should do round-trip saving properly with non-UTC timezones" do
+        Time.zone = 'Vienna'
+        time = Time.zone.parse('2012-09-01 12:00:00 +02:00')
+        @record = FieldTest.create!(:datetime_field => time)
+        visit edit_path(:model_name => "field_test", :id => @record.id)
+        click_button "Save"
+        @record = RailsAdmin::AbstractModel.new("FieldTest").first
+        @record.datetime_field.should == time
+      end
     end
 
     describe "a timestamp field", :active_record => true do
@@ -862,7 +872,7 @@ describe "RailsAdmin Config DSL Edit Section" do
         visit edit_path(:model_name => "field_test", :id => @record.id)
         find('#field_test_nested_field_tests_attributes_0_title').value.should == 'nested title 1'
         should_not have_selector('form .remove_nested_fields')
-        should have_selector('.fields_blueprint .remove_nested_fields')
+        should have_selector('[id$="_fields_blueprint"] .remove_nested_fields')
       end
     end
 
