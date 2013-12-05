@@ -10,6 +10,14 @@ module RailsAdmin
         include RailsAdmin::Config::Configurable
         include RailsAdmin::Config::Hideable
 
+        register_instance_option :only do
+          nil
+        end
+
+        register_instance_option :except do
+          []
+        end
+
         # http://twitter.github.com/bootstrap/base-css.html#icons
         register_instance_option :link_icon do
           'icon-question-sign'
@@ -17,11 +25,18 @@ module RailsAdmin
 
         # Should the action be visible
         register_instance_option :visible? do
-          authorized? && (bindings[:abstract_model] ? bindings[:abstract_model].config.with(bindings).try(:visible?) : true)
+          authorized?
         end
 
         register_instance_option :authorized? do
-          bindings[:controller] ? bindings[:controller].authorized?(self.authorization_key, bindings[:abstract_model], bindings[:object]) : true
+          (
+            bindings[:controller].nil? or bindings[:controller].authorized?(self.authorization_key, bindings[:abstract_model], bindings[:object])
+          ) and (
+            bindings[:abstract_model].nil? or (
+              (only.nil? or [only].flatten.map(&:to_s).include?(bindings[:abstract_model].to_s)) and
+              ![except].flatten.map(&:to_s).include?(bindings[:abstract_model].to_s) and
+              bindings[:abstract_model].config.with(bindings).visible?
+          ))
         end
 
         # Is the action acting on the root level (Example: /admin/contact)
@@ -37,6 +52,11 @@ module RailsAdmin
         # Is the action on an object scope (Example: /admin/team/1/edit)
         register_instance_option :member? do
           false
+        end
+
+        # Render via pjax?
+        register_instance_option :pjax? do
+          true
         end
 
         # This block is evaluated in the context of the controller when action is called

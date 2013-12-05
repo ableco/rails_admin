@@ -1,66 +1,62 @@
 source 'https://rubygems.org'
 
-# Bundle gems for the local environment. Make sure to
-# put test-only gems in this group so their generators
-# and rake tasks are available in development mode:
 group :active_record do
   platforms :jruby do
     case ENV['CI_DB_ADAPTER']
     when 'mysql'
-      gem 'activerecord-jdbcmysql-adapter', '~> 1.2'
-      gem 'jdbc-mysql', '~> 5.1'
+      gem 'activerecord-jdbcmysql-adapter', '>= 1.2'
+      gem 'jdbc-mysql', '>= 5.1'
     when 'postgresql'
-      gem 'activerecord-jdbcpostgresql-adapter', '~> 1.2'
-      gem 'jdbc-postgres', '~> 9.0'
+      gem 'activerecord-jdbcpostgresql-adapter', '>= 1.2'
+      gem 'jdbc-postgres', '>= 9.2'
     else
-      gem 'activerecord-jdbcsqlite3-adapter', '~> 1.2'
-      gem 'jdbc-sqlite3', '~> 3.6'
+      gem 'activerecord-jdbcsqlite3-adapter', '>= 1.3.0.beta1'
+      gem 'jdbc-sqlite3', '>= 3.7'
     end
   end
 
   platforms :ruby, :mswin, :mingw do
     case ENV['CI_DB_ADAPTER']
-    when 'mysql'
-      gem 'mysql', '~> 2.8'
+    when 'mysql2'
+      gem 'mysql2', '~> 0.3.14'
     when 'postgresql'
-      gem 'pg', '~> 0.13'
+      gem 'pg', '>= 0.14'
     else
-      gem 'sqlite3', '~> 1.3'
+      gem 'sqlite3', '>= 1.3'
     end
   end
-  gem 'carrierwave'
 end
 
 group :mongoid do
-  gem 'mongoid', '~> 3.0'
-  gem 'mongoid-paperclip', '~> 0.0.8', :require => 'mongoid_paperclip'
-  gem 'carrierwave-mongoid', :require => 'carrierwave/mongoid', :git => 'git://github.com/jnicklas/carrierwave-mongoid.git', :branch => 'mongoid-3.0'
-end
-
-group :debug do
-  platform :mri_18 do
-    gem 'ruby-debug'
-    gem 'linecache'
-  end
-
-  platform :mri_19 do
-    gem 'ruby-debug19'
-    gem 'simplecov', :require => false
-  end
-
-  platform :jruby do
-    gem 'ruby-debug'
-  end
-end
-
-platforms :jruby, :mingw_18, :ruby_18 do
-  gem 'fastercsv', '~> 1.5'
+  gem 'mongoid', :github => 'mongoid/mongoid'
+  gem 'mongoid-paperclip', '>= 0.0.8', :require => 'mongoid_paperclip'
+  gem 'mongoid-grid_fs', :github => 'ahoward/mongoid-grid_fs'
+  gem 'carrierwave-mongoid', '>= 0.6.3', :require => 'carrierwave/mongoid'
 end
 
 group :development, :test do
-  gem 'cancan'
-  gem 'devise'
-  gem 'paperclip'
+  gem 'pry', '>= 0.9'
+  gem 'pry-debugger', '>= 0.2', :platforms => [:mri_19, :mri_20]
+end
+
+group :test do
+  gem 'cancan', '>= 1.6'
+  gem 'capybara', '>= 2.1'
+  gem 'carrierwave', '>= 0.8'
+  gem 'coveralls', :require => false
+  gem 'database_cleaner', '>= 1.2'
+  gem 'devise', '>= 3.2'
+  gem 'dragonfly', '~> 0.9.0'
+  gem 'rack-cache', :require => 'rack/cache'
+  gem 'factory_girl', '>= 4.2'
+  gem 'generator_spec', '>= 0.8'
+  gem 'launchy', '>= 2.2'
+  gem 'mini_magick', '>= 3.4'
+  gem 'paperclip', '>= 3.4'
+  gem 'poltergeist', :github => 'jonleighton/poltergeist'
+  gem 'rspec-rails', '>= 2.14'
+  gem 'simplecov', :require => false
+  gem 'timecop', '>= 0.5'
 end
 
 gemspec

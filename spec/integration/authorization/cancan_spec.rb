@@ -18,8 +18,8 @@ class Ability
       can :access, :rails_admin
       can :manage, :all
       can :show_in_app, :all
-      
-      
+
+
       # fix for buggy and inconsistent behaviour in Cancan 1.6.8 => https://github.com/ryanb/cancan/issues/721
       if CI_ORM != :mongoid
         cannot [:update, :destroy], Player
@@ -59,13 +59,11 @@ describe "RailsAdmin CanCan Authorization" do
     end
 
     it "GET /admin should raise CanCan::AccessDenied" do
-      visit dashboard_path
-      should have_content('CanCan::AccessDenied')
+      expect{ visit dashboard_path }.to raise_error(CanCan::AccessDenied)
     end
 
     it "GET /admin/player should raise CanCan::AccessDenied" do
-      visit index_path(:model_name => "player")
-      should have_content('CanCan::AccessDenied')
+      expect{ visit index_path(:model_name => "player") }.to raise_error(CanCan::AccessDenied)
     end
   end
 
@@ -76,9 +74,9 @@ describe "RailsAdmin CanCan Authorization" do
 
     it "GET /admin should show Player but not League" do
       visit dashboard_path
-      body.should have_content("Player")
-      body.should_not have_content("League")
-      body.should_not have_content("Add new")
+      should have_content("Player")
+      should_not have_content("League")
+      should_not have_content("Add new")
     end
 
     it "GET /admin/player should render successfully but not list retired players and not show new, edit, or delete actions" do
@@ -106,13 +104,11 @@ describe "RailsAdmin CanCan Authorization" do
     end
 
     it "GET /admin/team should raise CanCan::AccessDenied" do
-      visit index_path(:model_name => "team")
-      should have_content('CanCan::AccessDenied')
+      expect{ visit index_path(:model_name => "team") }.to raise_error(CanCan::AccessDenied)
     end
 
     it "GET /admin/player/new should raise CanCan::AccessDenied" do
-      visit new_path(:model_name => "player")
-      should have_content('CanCan::AccessDenied')
+      expect{ visit new_path(:model_name => "player") }.to raise_error(CanCan::AccessDenied)
     end
 
   end
@@ -132,20 +128,19 @@ describe "RailsAdmin CanCan Authorization" do
       fill_in "player[name]", :with   => "Jackie Robinson"
       fill_in "player[number]", :with => "42"
       fill_in "player[position]", :with => "Second baseman"
-      click_button "Save"
+      click_button "Save" # first(:button, "Save").click
       should_not have_content("Edit")
 
       @player = RailsAdmin::AbstractModel.new("Player").first
-      @player.name.should eql("Jackie Robinson")
-      @player.number.should eql(42)
-      @player.position.should eql("Second baseman")
-      @player.should be_suspended # suspended is inherited behavior based on permission
+      expect(@player.name).to eq("Jackie Robinson")
+      expect(@player.number).to eq(42)
+      expect(@player.position).to eq("Second baseman")
+      expect(@player).to be_suspended # suspended is inherited behavior based on permission
     end
 
     it "GET /admin/player/1/edit should raise access denied" do
       @player = FactoryGirl.create :player
-      visit edit_path(:model_name => "player", :id => @player.id)
-      should have_content('CanCan::AccessDenied')
+      expect{ visit edit_path(:model_name => "player", :id => @player.id) }.to raise_error(CanCan::AccessDenied)
     end
 
   end
@@ -165,27 +160,25 @@ describe "RailsAdmin CanCan Authorization" do
       should_not have_content("History")
       should_not have_content("Show in app")
       fill_in "player[name]", :with => "Jackie Robinson"
-      click_button "Save"
+      click_button "Save" # click_button "Save" # first(:button, "Save").click
       @player.reload
-      @player.name.should eql("Jackie Robinson")
+      expect(@player.name).to eq("Jackie Robinson")
     end
 
     it "GET /admin/player/1/edit with retired player should raise access denied" do
       @player = FactoryGirl.create :player, :retired => true
-      visit edit_path(:model_name => "player", :id => @player.id)
-      should have_content('CanCan::AccessDenied')
+      expect{ visit edit_path(:model_name => "player", :id => @player.id) }.to raise_error(CanCan::AccessDenied)
     end
 
     it "GET /admin/player/1/delete should raise access denied" do
       @player = FactoryGirl.create :player
-      visit delete_path(:model_name => "player", :id => @player.id)
-      should have_content('CanCan::AccessDenied')
+      expect{ visit delete_path(:model_name => "player", :id => @player.id) }.to raise_error(CanCan::AccessDenied)
     end
 
   end
 
   describe "with history role" do
-    it 'shows links to history action' do
+    it "shows links to history action" do
 
       @user.update_attributes(:roles => [:admin, :read_player, :history_player])
       @player = FactoryGirl.create :player
@@ -206,7 +199,7 @@ describe "RailsAdmin CanCan Authorization" do
   end
 
   describe "with show in app role" do
-    it 'shows links to show in app action' do
+    it "shows links to show in app action" do
 
       @user.update_attributes(:roles => [:admin, :read_player, :show_in_app_player])
       @player = FactoryGirl.create :player
@@ -229,7 +222,7 @@ describe "RailsAdmin CanCan Authorization" do
   end
 
   describe "with all roles" do
-    it 'shows links to all actions' do
+    it "shows links to all actions" do
 
       @user.update_attributes(:roles => [:admin, :manage_player])
       @player = FactoryGirl.create :player
@@ -263,32 +256,31 @@ describe "RailsAdmin CanCan Authorization" do
 
       click_button "Yes, I'm sure"
 
-      @player_model.get(player_id).should be_nil
+      expect(@player_model.get(player_id)).to be_nil
     end
 
     it "GET /admin/player/1/delete with retired player should raise access denied" do
       @player = FactoryGirl.create :player, :retired => true
-      visit delete_path(:model_name => "player", :id => @player.id)
-      should have_content('CanCan::AccessDenied')
+      expect{ visit delete_path(:model_name => "player", :id => @player.id) }.to raise_error(CanCan::AccessDenied)
     end
 
     it "GET /admin/player/bulk_delete should render records which are authorized to" do
       active_player = FactoryGirl.create :player, :retired => false
       retired_player = FactoryGirl.create :player, :retired => true
 
-      page.driver.post(bulk_action_path(:bulk_action => 'bulk_delete', :model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id)))
+      post bulk_action_path(:bulk_action => 'bulk_delete', :model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id))
 
-      should have_content(active_player.name)
-      should_not have_content(retired_player.name)
+      expect(response.body).to include(active_player.name)
+      expect(response.body).not_to include(retired_player.name)
     end
 
     it "POST /admin/player/bulk_destroy should destroy records which are authorized to" do
       active_player = FactoryGirl.create :player, :retired => false
       retired_player = FactoryGirl.create :player, :retired => true
 
-      page.driver.delete(bulk_delete_path(:model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id)))
-      @player_model.get(active_player.id).should be_nil
-      @player_model.get(retired_player.id).should_not be_nil
+      delete bulk_delete_path(:model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id))
+      expect(@player_model.get(active_player.id)).to be_nil
+      expect(@player_model.get(retired_player.id)).not_to be_nil
     end
   end
 
@@ -298,10 +290,10 @@ describe "RailsAdmin CanCan Authorization" do
       active_player = FactoryGirl.create :player, :retired => false
       retired_player = FactoryGirl.create :player, :retired => true
 
-      page.driver.post(bulk_action_path(:bulk_action => 'bulk_delete', :model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id)))
-      
-      should have_content(active_player.name)
-      should_not have_content(retired_player.name)
+      post bulk_action_path(:bulk_action => 'bulk_delete', :model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id))
+
+      expect(response.body).to include(active_player.name)
+      expect(response.body).not_to include(retired_player.name)
     end
 
     it "POST /admin/player/bulk_destroy should destroy records which are authorized to" do
@@ -309,9 +301,9 @@ describe "RailsAdmin CanCan Authorization" do
       active_player = FactoryGirl.create :player, :retired => false
       retired_player = FactoryGirl.create :player, :retired => true
 
-      page.driver.delete(bulk_delete_path(:model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id)))
-      @player_model.get(active_player.id).should be_nil
-      @player_model.get(retired_player.id).should_not be_nil
+      delete bulk_delete_path(:model_name => "player", :bulk_ids => [active_player, retired_player].map(&:id))
+      expect(@player_model.get(active_player.id)).to be_nil
+      expect(@player_model.get(retired_player.id)).not_to be_nil
     end
   end
 
@@ -329,36 +321,36 @@ describe "RailsAdmin CanCan Authorization" do
 
       it "GET /admin/team should render successfully" do
         visit index_path(:model_name => "team")
-        page.status_code.should == 200
+        expect(page.status_code).to eq(200)
       end
 
       it "GET /admin/player/new should render successfully" do
         visit new_path(:model_name => "player")
-        page.status_code.should == 200
+        expect(page.status_code).to eq(200)
       end
 
       it "GET /admin/player/1/edit should render successfully" do
         @player = FactoryGirl.create :player
         visit edit_path(:model_name => "player", :id => @player.id)
-        page.status_code.should == 200
+        expect(page.status_code).to eq(200)
       end
 
       it "GET /admin/player/1/edit with retired player should render successfully" do
         @player = FactoryGirl.create :player, :retired => true
         visit edit_path(:model_name => "player", :id => @player.id)
-        page.status_code.should == 200
+        expect(page.status_code).to eq(200)
       end
 
       it "GET /admin/player/1/delete should render successfully" do
         @player = FactoryGirl.create :player
         visit delete_path(:model_name => "player", :id => @player.id)
-        page.status_code.should == 200
+        expect(page.status_code).to eq(200)
       end
 
       it "GET /admin/player/1/delete with retired player should render successfully" do
         @player = FactoryGirl.create :player, :retired => true
         visit delete_path(:model_name => "player", :id => @player.id)
-        page.status_code.should == 200
+        expect(page.status_code).to eq(200)
       end
     end
   end

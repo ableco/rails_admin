@@ -10,11 +10,11 @@ describe "RailsAdmin Basic Update" do
       visit edit_path(:model_name => "player", :id => @player.id)
     end
 
-    it "should return to edit page" do
+    it "returns to edit page" do
       fill_in "player[name]", :with => ""
-      click_button "Save"
-      page.driver.status_code.should eql(406)
-      should have_selector "form", :action => "/admin/players/#{@player.id}"
+      click_button "Save" # first(:button, "Save").click
+      expect(page.driver.status_code).to eq(406)
+      should have_selector "form[action='#{edit_path(:model_name => "player", :id => @player.id)}']"
     end
   end
 
@@ -27,15 +27,15 @@ describe "RailsAdmin Basic Update" do
       fill_in "player[name]", :with => "Jackie Robinson"
       fill_in "player[number]", :with => "42"
       fill_in "player[position]", :with => "Second baseman"
-      click_button "Save"
+      click_button "Save" # first(:button, "Save").click
 
       @player = RailsAdmin::AbstractModel.new("Player").first
     end
 
-    it "should update an object with correct attributes" do
-      @player.name.should eql("Jackie Robinson")
-      @player.number.should eql(42)
-      @player.position.should eql("Second baseman")
+    it "updates an object with correct attributes" do
+      expect(@player.name).to eq("Jackie Robinson")
+      expect(@player.number).to eq(42)
+      expect(@player.position).to eq("Second baseman")
     end
   end
 
@@ -53,10 +53,10 @@ describe "RailsAdmin Basic Update" do
       @player.reload
     end
 
-    it "should update an object with correct attributes" do
-      @player.name.should eql("Jackie Robinson")
-      @player.number.should eql(42)
-      @player.position.should eql("Second baseman")
+    it "updates an object with correct attributes" do
+      expect(@player.name).to eq("Jackie Robinson")
+      expect(@player.number).to eq(42)
+      expect(@player.position).to eq("Second baseman")
     end
   end
 
@@ -65,24 +65,24 @@ describe "RailsAdmin Basic Update" do
       @player = FactoryGirl.create :player
       @draft = FactoryGirl.create :draft
       @number = @draft.player.number + 1 # to avoid collision
-      page.driver.put edit_path(:model_name => "player", :id => @player.id, :player => {:name => "Jackie Robinson", :draft_id => @draft.id, :number => @number, :position => "Second baseman"})
+      put edit_path(:model_name => "player", :id => @player.id, :player => {:name => "Jackie Robinson", :draft_id => @draft.id, :number => @number, :position => "Second baseman"})
       @player.reload
     end
 
-    it "should update an object with correct attributes" do
-      @player.name.should eql("Jackie Robinson")
-      @player.number.should eql(@number)
-      @player.position.should eql("Second baseman")
+    it "updates an object with correct attributes" do
+      expect(@player.name).to eq("Jackie Robinson")
+      expect(@player.number).to eq(@number)
+      expect(@player.position).to eq("Second baseman")
     end
 
-    it "should update an object with correct associations" do
+    it "updates an object with correct associations" do
       @draft.reload
-      @player.draft.should eql(@draft)
+      expect(@player.draft).to eq(@draft)
     end
   end
 
   describe "update with has-many association" do
-    it "should be fillable and emptyable", :active_record => true do
+    it "is fillable and emptyable", :active_record => true do
       RailsAdmin.config do |c|
         c.audit_with :history
       end
@@ -90,32 +90,32 @@ describe "RailsAdmin Basic Update" do
       @league = FactoryGirl.create :league
       @divisions = 3.times.map { Division.create!(:name => "div #{Time.now.to_f}", :league => League.create!(:name => "league #{Time.now.to_f}")) }
 
-      page.driver.put edit_path(:model_name => "league", :id => @league.id, :league => {:name => "National League", :division_ids => [@divisions[0].id] })
+      put edit_path(:model_name => "league", :id => @league.id, :league => {:name => "National League", :division_ids => [@divisions[0].id] })
 
+      old_name = @league.name
       @league.reload
-      @league.name.should eql("National League")
+      expect(@league.name).to eq("National League")
       @divisions[0].reload
-      @league.divisions.should include(@divisions[0])
-      @league.divisions.should_not include(@divisions[1])
-      @league.divisions.should_not include(@divisions[2])
+      expect(@league.divisions).to include(@divisions[0])
+      expect(@league.divisions).not_to include(@divisions[1])
+      expect(@league.divisions).not_to include(@divisions[2])
 
-      RailsAdmin::History.where(:item => @league.id).collect(&:message).should include("Added Divisions ##{@divisions[0].id} associations, Changed name")
+      expect(RailsAdmin::History.where(:item => @league.id).collect(&:message)).to include("name: \"#{old_name}\" -> \"National League\"")
 
-      page.driver.put edit_path(:model_name => "league", :id => @league.id, :league => {:division_ids => [""]})
+      put edit_path(:model_name => "league", :id => @league.id, :league => {:division_ids => [""]})
 
       @league.reload
-      @league.divisions.should be_empty
-      RailsAdmin::History.where(:item => @league.id).collect(&:message).should include("Removed Divisions ##{@divisions[0].id} associations")
+      expect(@league.divisions).to be_empty
     end
   end
 
   describe "update with missing object" do
     before(:each) do
-      page.driver.put(edit_path(:model_name => "player", :id => 1), :params => {:player => {:name => "Jackie Robinson", :number => 42, :position => "Second baseman"}})
+      put edit_path(:model_name => "player", :id => 1), :params => {:player => {:name => "Jackie Robinson", :number => 42, :position => "Second baseman"}}
     end
 
-    it "should raise NotFound" do
-      page.driver.status_code.should eql(404)
+    it "raises NotFound" do
+      expect(response.code).to eq("404")
     end
   end
 
@@ -128,16 +128,16 @@ describe "RailsAdmin Basic Update" do
       fill_in "player[name]", :with => "Jackie Robinson"
       fill_in "player[number]", :with => "a"
       fill_in "player[position]", :with => "Second baseman"
-      click_button "Save"
+      click_button "Save" # first(:button, "Save").click
 
       @player.reload
     end
 
-    it "should show an error message" do
+    it "shows an error message" do
       # TODO: Mongoid 3.0.0 lacks ability of numericality validation on Integer field.
       # This is caused by change in https://github.com/mongoid/mongoid/pull/1698
       # I believe this should be a bug in Mongoid.
-      body.should have_content("Player failed to be updated") unless CI_ORM == :mongoid && Mongoid::VERSION >= '3.0.0'
+      expect(Capybara.string(body)).to have_content("Player failed to be updated") unless CI_ORM == :mongoid && Mongoid::VERSION >= '3.0.0'
     end
   end
 
@@ -154,13 +154,13 @@ describe "RailsAdmin Basic Update" do
       visit edit_path(:model_name => "user", :id => @user.id)
 
       fill_in "user[roles]", :with => %{['admin', 'user']}
-      click_button "Save"
+      click_button "Save" # first(:button, "Save").click
 
       @user.reload
     end
 
-    it "should save the serialized data" do
-      @user.roles.should eql(['admin','user'])
+    it "saves the serialized data" do
+      expect(@user.roles).to eq(['admin','user'])
     end
   end
 
@@ -171,24 +171,24 @@ describe "RailsAdmin Basic Update" do
       visit edit_path(:model_name => "field_test", :id => @field_test.id)
     end
 
-    it "should save the serialized data" do
+    it "saves the serialized data" do
       fill_in "field_test[array_field]", :with => "[4, 2]"
       fill_in "field_test[hash_field]", :with => "{ a: 6, b: 2 }"
-      click_button "Save"
+      click_button "Save" # first(:button, "Save").click
 
       @field_test.reload
-      @field_test.array_field.should eql([4, 2])
-      @field_test.hash_field.should eql({ "a" => 6, "b" => 2 })
+      expect(@field_test.array_field).to eq([4, 2])
+      expect(@field_test.hash_field).to eq({ "a" => 6, "b" => 2 })
     end
 
-    it "should clear data when empty string is passed" do
+    it "clears data when empty string is passed" do
       fill_in "field_test[array_field]", :with => ""
       fill_in "field_test[hash_field]", :with => ""
-      click_button "Save"
+      click_button "Save" # first(:button, "Save").click
 
       @field_test.reload
-      @field_test.array_field.should eql(nil)
-      @field_test.hash_field.should eql(nil)
+      expect(@field_test.array_field).to eq(nil)
+      expect(@field_test.hash_field).to eq(nil)
     end
   end
 
@@ -204,8 +204,8 @@ describe "RailsAdmin Basic Update" do
       @ball.reload
     end
 
-    it "should update an object with correct attributes" do
-      @ball.color.should eql("gray")
+    it "updates an object with correct attributes" do
+      expect(@ball.color).to eq("gray")
     end
   end
 
@@ -221,8 +221,8 @@ describe "RailsAdmin Basic Update" do
       @hardball.reload
     end
 
-    it "should update an object with correct attributes" do
-      @hardball.color.should eql("cyan")
+    it "updates an object with correct attributes" do
+      expect(@hardball.color).to eq("cyan")
     end
   end
 

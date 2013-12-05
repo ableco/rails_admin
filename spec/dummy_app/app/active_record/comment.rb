@@ -1,5 +1,4 @@
 class Comment < ActiveRecord::Base
-  attr_accessible :commentable_id, :commentable_type, :content
-
+  include Taggable
   belongs_to :commentable, :polymorphic => true
 end

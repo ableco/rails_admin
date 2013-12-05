@@ -13,25 +13,24 @@ module RailsAdmin
                 end
 
                 def #{name.to_s.singularize}_ids=(item_ids)
-                  items = Array.wrap(item_ids).map{|item_id| #{name}.klass.find(item_id) rescue nil }.compact
-                  if persisted?
-                    #{name}.substitute items
-                  else
-                    items.each do |item|
+                  __items__ = Array.wrap(item_ids).map{|item_id| #{name}.klass.find(item_id) rescue nil }.compact
+                  unless persisted?
+                    __items__.each do |item|
                       item.update_attribute('#{association.foreign_key}', id)
                     end
                   end
+                  super __items__.map &:id
                 end
 RUBY
             elsif [:has_one, :references_one].include? association.macro
               instance_eval <<-RUBY, __FILE__, __LINE__ + 1
                 def #{name.to_s}_id=(item_id)
                   item = (#{association.klass}.find(item_id) rescue nil)
-                  if persisted?
-                    self.#{name} = item
-                  else
-                    item.update_attribute('#{association.foreign_key}', id) if item
+                  return unless item
+                  unless persisted?
+                    item.update_attribute('#{association.foreign_key}', id)
                   end
+                  super item.id
                 end
 RUBY
             end

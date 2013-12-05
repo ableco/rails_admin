@@ -13,9 +13,18 @@ module RailsAdmin
           end
 
           # Accessor for field's formatted value
-          register_instance_option(:formatted_value) do
+          register_instance_option :formatted_value do
             (o = value) && o.send(associated_model_config.object_label_method)
           end
+
+          register_instance_option :inline_add do
+            true
+          end
+
+          register_instance_option :inline_edit do
+            true
+          end
+
 
           def editable?
             (nested_form || abstract_model.model.new.respond_to?("#{self.name}_id=")) && super
@@ -26,9 +35,9 @@ module RailsAdmin
           end
 
           def method_name
-            nested_form ? "#{self.name}_attributes" : "#{self.name}_id"
+            nested_form ? "#{self.name}_attributes".to_sym  : "#{self.name}_id".to_sym
           end
-          
+
           def multiple?
             false
           end

@@ -1,4 +1,4 @@
-require 'rails_admin/config/model'
+require 'rails_admin/config/lazy_model'
 require 'rails_admin/config/sections/list'
 require 'active_support/core_ext/class/attribute_accessors'
 
@@ -15,8 +15,6 @@ module RailsAdmin
     DEFAULT_AUTHENTICATION = Proc.new do
       request.env['warden'].try(:authenticate!)
     end
-
-    DEFAULT_ATTR_ACCESSIBLE_ROLE = Proc.new { :default }
 
     DEFAULT_AUTHORIZE = Proc.new {}
 
@@ -63,12 +61,15 @@ module RailsAdmin
       # Stores model configuration objects in a hash identified by model's class
       # name.
       #
-      # @see RailsAdmin::Config.model
+      # @see RailsAdmin.config
       attr_reader :registry
 
       # accepts a hash of static links to be shown below the main navigation
       attr_accessor :navigation_static_links
       attr_accessor :navigation_static_label
+
+      # yell about fields that are not marked as accessible
+      attr_accessor :yell_for_non_accessible_fields
 
       # Setup authentication to be run as a before filter
       # This is run inside the controller instance so you can setup any authentication you need to
@@ -96,12 +97,6 @@ module RailsAdmin
       def authenticate_with(&blk)
         @authenticate = blk if blk
         @authenticate || DEFAULT_AUTHENTICATION
-      end
-
-
-      def attr_accessible_role(&blk)
-        @attr_accessible_role = blk if blk
-        @attr_accessible_role || DEFAULT_ATTR_ACCESSIBLE_ROLE
       end
 
       # Setup auditing/history/versioning provider that observe objects lifecycle
@@ -197,24 +192,9 @@ module RailsAdmin
 
       # pool of all found model names from the whole application
       def models_pool
-        possible =
-          included_models.map(&:to_s).presence || (
-          @@system_models ||= # memoization for tests
-            ([Rails.application] + Rails::Application::Railties.engines).map do |app|
-              (app.paths['app/models'] + app.config.autoload_paths).map do |load_path|
-                Dir.glob(app.root.join(load_path)).map do |load_dir|
-                  Dir.glob(load_dir + "/**/*.rb").map do |filename|
-                    # app/models/module/class.rb => module/class.rb => module/class => Module::Class
-                    lchomp(filename, "#{app.root.join(load_dir)}/").chomp('.rb').camelize
-                  end
-                end
-              end
-            end.flatten
-          )
-
         excluded = (excluded_models.map(&:to_s) + ['RailsAdmin::History'])
 
-        (possible - excluded).uniq.sort
+        (viable_models - excluded).uniq.sort
       end
 
       # Loads a model configuration instance from the registry or registers
@@ -241,9 +221,12 @@ module RailsAdmin
             entity.class.name.to_sym
           end
         end
-        config = @registry[key] ||= RailsAdmin::Config::Model.new(entity)
-        config.instance_eval(&block) if block
-        config
+
+        if block
+          @registry[key] = RailsAdmin::Config::LazyModel.new(entity, &block)
+        else
+          @registry[key] ||= RailsAdmin::Config::LazyModel.new(entity)
+        end
       end
 
       def default_hidden_fields=(fields)
@@ -263,12 +246,9 @@ module RailsAdmin
 
       # Returns all model configurations
       #
-      # If a block is given it is evaluated in the context of configuration
-      # instances.
-      #
       # @see RailsAdmin::Config.registry
-      def models(&block)
-        RailsAdmin::AbstractModel.all.map{|m| model(m, &block)}
+      def models
+        RailsAdmin::AbstractModel.all.map{|m| model(m)}
       end
 
       # Reset all configurations to defaults.
@@ -276,6 +256,7 @@ module RailsAdmin
       # @see RailsAdmin::Config.registry
       def reset
         @compact_show_view = true
+        @yell_for_non_accessible_fields = true
         @authenticate = nil
         @authorize = nil
         @audit = nil
@@ -311,8 +292,12 @@ module RailsAdmin
       # @see RailsAdmin::Config::Hideable
 
       def visible_models(bindings)
-        models.map{|m| m.with(bindings) }.select{|m| m.visible? && bindings[:controller].authorized?(:index, m.abstract_model) && !m.abstract_model.embedded?}.sort do |a, b|
-          (weight_order = a.weight <=> b.weight) == 0 ? a.label.downcase <=> b.label.downcase : weight_order
+        visible_models_with_bindings(bindings).sort do |a, b|
+          if (weight_order = a.weight <=> b.weight) == 0
+            a.label.downcase <=> b.label.downcase
+          else
+            weight_order
+          end
         end
       end
 
@@ -320,6 +305,30 @@ module RailsAdmin
 
       def lchomp(base, arg)
         base.to_s.reverse.chomp(arg.to_s.reverse).reverse
+      end
+
+      def viable_models
+        included_models.map(&:to_s).presence || (
+          @@system_models ||= # memoization for tests
+            ([Rails.application] + Rails::Engine::Railties.engines).map do |app|
+              (app.paths['app/models'].to_a + app.config.autoload_paths).map do |load_path|
+                Dir.glob(app.root.join(load_path)).map do |load_dir|
+                  Dir.glob(load_dir + "/**/*.rb").map do |filename|
+                    # app/models/module/class.rb => module/class.rb => module/class => Module::Class
+                    lchomp(filename, "#{app.root.join(load_dir)}/").chomp('.rb').camelize
+                  end
+                end
+              end
+            end.flatten.reject {|m| m.starts_with?('Concerns::') }
+          )
+      end
+
+      def visible_models_with_bindings(bindings)
+        models.map {|m| m.with(bindings)}.select do |m|
+          m.visible? &&
+            bindings[:controller].authorized?(:index, m.abstract_model) &&
+            (!m.abstract_model.embedded? || m.abstract_model.cyclic?)
+        end
       end
     end
 

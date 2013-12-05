@@ -1,13 +1,14 @@
 require 'spec_helper'
 
-describe "RailsAdmin" do
+describe RailsAdmin do
 
   subject { page }
 
   describe "authentication" do
-    it "should be disableable" do
+    it "is disableable" do
       logout
       RailsAdmin.config do |config|
+        config.included_models = []
         config.authenticate_with {}
       end
       visit dashboard_path
@@ -18,10 +19,11 @@ describe "RailsAdmin" do
   # root key from en to their own locale (as people tend to use the English
   # file as template for a new translation).
   describe "localization" do
-    it "should default to English" do
+    it "defaults to English" do
+      RailsAdmin.config.included_models = []
       visit dashboard_path
 
-      should have_content("Site administration")
+      should have_content("Site Administration")
       should have_content("Dashboard")
     end
   end
@@ -31,17 +33,17 @@ describe "RailsAdmin" do
 
     # Note: the [href^="/asset... syntax matches the start of a value. The reason
     # we just do that is to avoid being confused by rails' asset_ids.
-    it "should load stylesheets in header" do
-      should have_selector('head link[href^="/assets/rails_admin/rails_admin.css"]')
+    it "loads stylesheets in header" do
+      should have_selector('head link[href^="/assets/rails_admin/rails_admin.css"]', :visible => false)
     end
 
-    it "should load javascript files in body" do
-      should have_selector('head script[src^="/assets/rails_admin/rails_admin.js"]')
+    it "loads javascript files in body" do
+      should have_selector('head script[src^="/assets/rails_admin/rails_admin.js"]', :visible => false)
     end
   end
 
-  describe 'hidden fields with default values' do
-    
+  describe "hidden fields with default values" do
+
     before (:each) do
       RailsAdmin.config Player do
         include_all_fields
@@ -54,25 +56,25 @@ describe "RailsAdmin" do
         end
       end
     end
-    
-    it "should show up with default value, hidden" do
+
+    it "shows up with default value, hidden" do
       visit new_path(:model_name => "player")
       should have_selector("#player_name[type=hidden][value='username@example.com']")
       should_not have_selector("#player_name[type=hidden][value='toto@example.com']")
     end
-    
-    it "should not show label" do
+
+    it "does not show label" do
       should_not have_selector("label", :text => "Name")
     end
-    
-    it "should not show help block" do
+
+    it "does not show help block" do
       should_not have_xpath("id('player_name')/../p[@class='help-block']")
     end
   end
 
-  describe '_current_user' do # https://github.com/sferik/rails_admin/issues/549
+  describe "_current_user" do # https://github.com/sferik/rails_admin/issues/549
 
-    it 'should be accessible from the list view' do
+    it "is accessible from the list view" do
       RailsAdmin.config Player do
         list do
           field :name do
@@ -101,20 +103,20 @@ describe "RailsAdmin" do
       @comment = FactoryGirl.create :comment, :commentable => @team
     end
 
-    it "should work like belongs to associations in the list view" do
+    it "works like belongs to associations in the list view" do
       visit index_path(:model_name => "comment")
 
       should have_content(@team.name)
     end
 
-    it "should be editable" do
+    it "is editable" do
       visit edit_path(:model_name => "comment", :id => @comment.id)
 
       should have_selector("select#comment_commentable_type")
       should have_selector("select#comment_commentable_id")
     end
 
-    it "should be visible in the owning end" do
+    it "is visible in the owning end" do
       visit edit_path(:model_name => "team", :id => @team.id)
 
       should have_selector("select#team_comment_ids")
@@ -122,21 +124,28 @@ describe "RailsAdmin" do
   end
 
   describe "secondary navigation" do
-    it "should have Gravatar image" do
+    it "has Gravatar image" do
       visit dashboard_path
       should have_selector("ul.nav.pull-right li img")
     end
 
-    it "should not show Gravatar when user doesn't have email method" do
-      User.any_instance.stub(:respond_to?).with(:email).and_return(false)
+    it "does not show Gravatar when user doesn't have email method" do
+      allow_any_instance_of(User).to receive(:respond_to?).and_return(true)
+      allow_any_instance_of(User).to receive(:respond_to?).with(:email).and_return(false)
       visit dashboard_path
       should_not have_selector("ul.nav.pull-right li img")
     end
 
-    it "should not cause error when email is nil" do
-      User.any_instance.stub(:email).and_return(nil)
+    it "does not cause error when email is nil" do
+      allow_any_instance_of(User).to receive(:respond_to?).and_return(true)
+      allow_any_instance_of(User).to receive(:respond_to?).with(:email).and_return(nil)
       visit dashboard_path
       should have_selector("body.rails_admin")
+    end
+
+    it "shows a log out link" do
+      visit dashboard_path
+      should have_content "Log out"
     end
   end
 end

@@ -12,7 +12,7 @@ module RailsAdmin
           end
 
           register_instance_option :sortable do
-            @sortable ||= associated_model_config.abstract_model.properties.map{ |p| p[:name] }.include?(associated_model_config.object_label_method) ? associated_model_config.object_label_method : {self.abstract_model.table_name => self.method_name}
+            @sortable ||= abstract_model.adapter_supports_joins? && associated_model_config.abstract_model.properties.map{ |p| p[:name] }.include?(associated_model_config.object_label_method) ? associated_model_config.object_label_method : {self.abstract_model.table_name => self.method_name}
           end
 
           register_instance_option :searchable do
@@ -23,14 +23,22 @@ module RailsAdmin
             nested_form ? :form_nested_one : :form_filtering_select
           end
 
+          register_instance_option :inline_add do
+            true
+          end
+
+          register_instance_option :inline_edit do
+            true
+          end
+
           def selected_id
             bindings[:object].send(foreign_key)
           end
 
           def method_name
-            nested_form ? "#{self.name}_attributes" : association[:foreign_key]
+            nested_form ? "#{self.name}_attributes".to_sym : association[:foreign_key]
           end
-          
+
           def multiple?
             false
           end

@@ -5,10 +5,14 @@ CI_ORM = (ENV['CI_ORM'] || :active_record).to_sym
 CI_TARGET_ORMS = [:active_record, :mongoid]
 PK_COLUMN = {:active_record=>:id, :mongoid=>:_id}[CI_ORM]
 
-if ENV['INVOKE_SIMPLECOV']
-  require 'simplecov'
-  SimpleCov.start 'rails'
-end
+require 'simplecov'
+require 'coveralls'
+
+SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter[
+  SimpleCov::Formatter::HTMLFormatter,
+  Coveralls::SimpleCov::Formatter
+]
+SimpleCov.start
 
 require File.expand_path('../dummy_app/config/environment', __FILE__)
 
@@ -45,19 +49,29 @@ Devise.setup do |config|
   config.stretches = 0
 end
 
+require 'capybara/poltergeist'
+Capybara.javascript_driver = :poltergeist
+
 RSpec.configure do |config|
-  require 'rspec/expectations'
+  config.expect_with :rspec do |c|
+    c.syntax = :expect
+  end
 
   config.include RSpec::Matchers
   config.include RailsAdmin::Engine.routes.url_helpers
 
   config.include Warden::Test::Helpers
 
+  config.include Capybara::DSL, :type => :request
+
   config.before(:each) do
+    DatabaseCleaner.strategy = (CI_ORM == :mongoid || example.metadata[:js]) ? :truncation : :transaction
+
     DatabaseCleaner.start
     RailsAdmin::Config.reset
     RailsAdmin::AbstractModel.reset
     RailsAdmin::Config.audit_with(:history) if CI_ORM == :active_record
+    RailsAdmin::Config.yell_for_non_accessible_fields = false
     login_as User.create(
       :email => "username@example.com",
       :password => "password"

@@ -15,9 +15,8 @@ module RailsAdmin
           self.object = object
         end
 
-        # Patch: Ignore mass_assignment security for rails_admin forms.
-        def set_attributes(attributes, role = nil)
-          object.assign_attributes(attributes, :as => role, :without_protection => true)
+        def set_attributes(attributes)
+          object.assign_attributes(attributes)
         end
 
         def save(options = { :validate => true })

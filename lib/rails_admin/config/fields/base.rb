@@ -11,7 +11,7 @@ module RailsAdmin
         include RailsAdmin::Config::Configurable
         include RailsAdmin::Config::Hideable
         include RailsAdmin::Config::Groupable
-        
+
         attr_reader :name, :properties, :abstract_model
         attr_accessor :defined, :order, :section
         attr_reader :parent, :root
@@ -104,7 +104,7 @@ module RailsAdmin
         end
 
         register_instance_option :formatted_value do
-          value.to_s
+          value
         end
 
         # output for pretty printing (show, list)
@@ -120,7 +120,7 @@ module RailsAdmin
 
         # Accessor for field's help text displayed below input field.
         register_instance_option :help do
-          (@help ||= {})[::I18n.locale] ||= (required? ? I18n.translate("admin.form.required") : I18n.translate("admin.form.optional")) + '. '
+          (@help ||= {})[::I18n.locale] ||= generic_field_help
         end
 
         register_instance_option :html_attributes do
@@ -164,10 +164,12 @@ module RailsAdmin
         #
         # @see RailsAdmin::AbstractModel.properties
         register_instance_option :required? do
-          @required ||= !!([name] + children_fields).uniq.find do |column_name|
+          context = (bindings && bindings[:object] ? (bindings[:object].persisted? ? :update : :create) : :nil)
+          (@required ||= {})[context] ||= !!([name] + children_fields).uniq.find do |column_name|
             !!abstract_model.model.validators_on(column_name).find do |v|
-              v.kind == :presence && !v.options[:allow_nil] ||
-              v.kind == :numericality && !v.options[:allow_nil]
+              !v.options[:allow_nil] and
+              [:presence, :numericality, :attachment_presence].include?(v.kind) and
+              (v.options[:on] == context or v.options[:on].blank?)
             end
           end
         end
@@ -208,12 +210,11 @@ module RailsAdmin
         end
 
         register_instance_option :render do
-          bindings[:view].render :partial => partial.to_s, :locals => {:field => self, :form => bindings[:form] }
+          bindings[:view].render :partial => "rails_admin/main/#{partial}", :locals => {:field => self, :form => bindings[:form] }
         end
 
         def editable?
-          return false if @properties && @properties[:read_only]
-          !bindings[:object].class.active_authorizer[bindings[:view].controller.send(:_attr_accessible_role)].deny?(self.method_name)
+          !(@properties && @properties[:read_only])
         end
 
         # Is this an association
@@ -230,14 +231,14 @@ module RailsAdmin
 
         # Reader whether field is optional.
         #
-        # @see RailsAdmin::Config::Fields::Base.register_instance_option(:required?)
+        # @see RailsAdmin::Config::Fields::Base.register_instance_option :required?
         def optional?
           not required?
         end
 
         # Inverse accessor whether this field is required.
         #
-        # @see RailsAdmin::Config::Fields::Base.register_instance_option(:required?)
+        # @see RailsAdmin::Config::Fields::Base.register_instance_option :required?
         def optional(state = nil, &block)
           if !state.nil? || block
             required state.nil? ? proc { false == (instance_eval &block) } : false == state
@@ -268,6 +269,26 @@ module RailsAdmin
           false
         end
 
+        # Allowed methods for the field in forms
+        register_instance_option :allowed_methods do
+          [method_name]
+        end
+
+        def generic_help
+          (required? ? I18n.translate("admin.form.required") : I18n.translate("admin.form.optional")) + '. '
+        end
+
+        def generic_field_help
+          model = abstract_model.model_name.underscore
+          model_lookup = "admin.help.#{model}.#{name}".to_sym
+          translated = I18n.translate(model_lookup, :help => generic_help, :default => [generic_help])
+          (translated.is_a?(Hash) ? translated.to_a.first[1] : translated).html_safe
+        end
+
+        def parse_input(params)
+          # overriden
+        end
+
         def inverse_of
           nil
         end
@@ -276,8 +297,12 @@ module RailsAdmin
           name
         end
 
-        def html_default_value
-          bindings[:object].new_record? && self.value.nil? && !self.default_value.nil? ? self.default_value : nil
+        def form_default_value
+          (self.default_value if bindings[:object].new_record? && self.value.nil? && !self.default_value.nil?)
+        end
+
+        def form_value
+          self.form_default_value.nil? ? self.formatted_value : self.form_default_value
         end
 
         def inspect
