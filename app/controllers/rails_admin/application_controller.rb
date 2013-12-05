@@ -7,7 +7,7 @@ module RailsAdmin
   class ObjectNotFound < ::StandardError
   end
 
-  class ApplicationController < ::Admin::BaseController
+  class ApplicationController < ::ApplicationController
     newrelic_ignore if defined?(NewRelic)
 
     before_filter :_authenticate!
