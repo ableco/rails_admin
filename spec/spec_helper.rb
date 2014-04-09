@@ -1,18 +1,21 @@
 # Configure Rails Envinronment
-ENV["RAILS_ENV"] = "test"
-ENV['SKIP_RAILS_ADMIN_INITIALIZER'] = 'true'
+ENV['RAILS_ENV'] = 'test'
 CI_ORM = (ENV['CI_ORM'] || :active_record).to_sym
 CI_TARGET_ORMS = [:active_record, :mongoid]
-PK_COLUMN = {:active_record=>:id, :mongoid=>:_id}[CI_ORM]
+PK_COLUMN = {active_record: :id, mongoid: :_id}[CI_ORM]
 
 require 'simplecov'
 require 'coveralls'
 
-SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter[
+SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter[ # rubocop:disable SpaceBeforeFirstArg
   SimpleCov::Formatter::HTMLFormatter,
   Coveralls::SimpleCov::Formatter
 ]
-SimpleCov.start
+
+SimpleCov.start do
+  add_filter '/spec/'
+  minimum_coverage(91.71) unless defined? JRUBY_VERSION
+end
 
 require File.expand_path('../dummy_app/config/environment', __FILE__)
 
@@ -24,11 +27,9 @@ require "orm/#{CI_ORM}"
 
 ActionMailer::Base.delivery_method = :test
 ActionMailer::Base.perform_deliveries = true
-ActionMailer::Base.default_url_options[:host] = "example.com"
+ActionMailer::Base.default_url_options[:host] = 'example.com'
 
 Rails.backtrace_cleaner.remove_silencers!
-
-ENV['SKIP_RAILS_ADMIN_INITIALIZER'] = 'false'
 
 # Don't need passwords in test DB to be secure, but we would like 'em to be
 # fast -- and the stretches mechanism is intended to make passwords
@@ -36,7 +37,7 @@ ENV['SKIP_RAILS_ADMIN_INITIALIZER'] = 'false'
 module Devise
   module Models
     module DatabaseAuthenticatable
-      protected
+    protected
 
       def password_digest(password)
         password
@@ -62,9 +63,9 @@ RSpec.configure do |config|
 
   config.include Warden::Test::Helpers
 
-  config.include Capybara::DSL, :type => :request
+  config.include Capybara::DSL, type: :request
 
-  config.before(:each) do
+  config.before do
     DatabaseCleaner.strategy = (CI_ORM == :mongoid || example.metadata[:js]) ? :truncation : :transaction
 
     DatabaseCleaner.start
@@ -72,10 +73,6 @@ RSpec.configure do |config|
     RailsAdmin::AbstractModel.reset
     RailsAdmin::Config.audit_with(:history) if CI_ORM == :active_record
     RailsAdmin::Config.yell_for_non_accessible_fields = false
-    login_as User.create(
-      :email => "username@example.com",
-      :password => "password"
-    )
   end
 
   config.after(:each) do

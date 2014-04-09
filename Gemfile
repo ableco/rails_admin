@@ -1,6 +1,19 @@
 source 'https://rubygems.org'
 
-group :active_record do
+case ENV['RAILS_VER']
+when '4.0'
+  gem 'rails', '~> 4.0.0'
+else
+  gem 'rails', '~> 4.1.0.rc2'
+end
+
+case ENV['CI_ORM']
+when 'mongoid'
+  gem 'mongoid', '~> 4.0.0.beta1'
+  gem 'mongoid-paperclip', '>= 0.0.8', require: 'mongoid_paperclip'
+  gem 'carrierwave-mongoid', '>= 0.6.3', require: 'carrierwave/mongoid'
+  gem 'mongoid-grid_fs', '1.9.1' # workaround for mime-types version issue
+else
   platforms :jruby do
     case ENV['CI_DB_ADAPTER']
     when 'mysql'
@@ -27,35 +40,32 @@ group :active_record do
   end
 end
 
-group :mongoid do
-  gem 'mongoid', :github => 'mongoid/mongoid'
-  gem 'mongoid-paperclip', '>= 0.0.8', :require => 'mongoid_paperclip'
-  gem 'mongoid-grid_fs', :github => 'ahoward/mongoid-grid_fs'
-  gem 'carrierwave-mongoid', '>= 0.6.3', :require => 'carrierwave/mongoid'
-end
-
 group :development, :test do
   gem 'pry', '>= 0.9'
-  gem 'pry-debugger', '>= 0.2', :platforms => [:mri_19, :mri_20]
+  platforms :mri_19, :mri_20 do
+    gem 'pry-debugger', '>= 0.2'
+    gem 'pry-stack_explorer', '>= 0.4.9.1'
+  end
 end
 
 group :test do
   gem 'cancan', '>= 1.6'
   gem 'capybara', '>= 2.1'
   gem 'carrierwave', '>= 0.8'
-  gem 'coveralls', :require => false
+  gem 'coveralls', require: false
   gem 'database_cleaner', '>= 1.2'
   gem 'devise', '>= 3.2'
-  gem 'dragonfly', '~> 0.9.0'
-  gem 'rack-cache', :require => 'rack/cache'
+  gem 'dragonfly', '~> 1.0'
   gem 'factory_girl', '>= 4.2'
   gem 'generator_spec', '>= 0.8'
   gem 'launchy', '>= 2.2'
   gem 'mini_magick', '>= 3.4'
-  gem 'paperclip', '>= 3.4'
-  gem 'poltergeist', :github => 'jonleighton/poltergeist'
+  gem 'paperclip', '3.5.2'
+  gem 'poltergeist', '~> 1.5'
+  gem 'rack-cache', require: 'rack/cache'
   gem 'rspec-rails', '>= 2.14'
-  gem 'simplecov', :require => false
+  gem 'rubocop', '>= 0.19.0'
+  gem 'simplecov', require: false
   gem 'timecop', '>= 0.5'
 end
 

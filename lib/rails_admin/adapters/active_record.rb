@@ -26,7 +26,7 @@ module RailsAdmin
       end
 
       def all(options = {}, scope = nil)
-        scope ||= self.scoped
+        scope ||= scoped
         scope = scope.includes(options[:include]) if options[:include]
         scope = scope.limit(options[:limit]) if options[:limit]
         scope = scope.where(primary_key => options[:bulk_ids]) if options[:bulk_ids]
@@ -40,16 +40,16 @@ module RailsAdmin
       end
 
       def count(options = {}, scope = nil)
-        all(options.merge({:limit => false, :page => false}), scope).count
+        all(options.merge(limit: false, page: false), scope).count
       end
 
       def destroy(objects)
-        Array.wrap(objects).each &:destroy
+        Array.wrap(objects).each(&:destroy)
       end
 
       def associations
-        model.reflect_on_all_associations.map do |association|
-          Association.new(association, model).to_options_hash
+        model.reflect_on_all_associations.collect do |association|
+          Association.new(association, model)
         end
       end
 
@@ -57,23 +57,19 @@ module RailsAdmin
         columns = model.columns.reject do |c|
           c.type.blank? ||
             DISABLED_COLUMN_TYPES.include?(c.type.to_sym) ||
-            DISABLED_COLUMN_MATCHERS.any? {|matcher| matcher.match(c.type.to_s)}
+            DISABLED_COLUMN_MATCHERS.any? { |matcher| matcher.match(c.type.to_s) }
         end
-        columns.map do |property|
-          {
-            :name => property.name.to_sym,
-            :pretty_name => property.name.to_s.tr('_', ' ').capitalize,
-            :length => property.limit,
-            :nullable? => property.null,
-            :serial? => property.primary,
-          }.merge(type_lookup(property))
+        columns.collect do |property|
+          Property.new(property, model)
         end
       end
 
-      delegate :primary_key, :table_name, :to => :model, :prefix => false
+      delegate :primary_key, :table_name, to: :model, prefix: false
 
       def encoding
-        Rails.configuration.database_configuration[Rails.env]['encoding']
+        encoding = ::ActiveRecord::Base.connection.try(:encoding)
+        encoding ||= ::ActiveRecord::Base.connection.try(:charset) # mysql2
+        encoding || 'UTF-8'
       end
 
       def embedded?
@@ -88,10 +84,7 @@ module RailsAdmin
         true
       end
 
-      private
-
       class WhereBuilder
-
         def initialize(scope)
           @statements = []
           @values = []
@@ -111,7 +104,9 @@ module RailsAdmin
         end
 
         def build
-          @scope.where(@statements.join(' OR '), *@values).references(*(@tables.uniq))
+          scope = @scope.where(@statements.join(' OR '), *@values)
+          scope = scope.references(*(@tables.uniq)) if @tables.any?
+          scope
         end
       end
 
@@ -130,7 +125,7 @@ module RailsAdmin
         filters.each_pair do |field_name, filters_dump|
           filters_dump.each do |_, filter_dump|
             wb = WhereBuilder.new(scope)
-            wb.add(fields.find{|f| f.name.to_s == field_name}, filter_dump[:v], (filter_dump[:o] || 'default'))
+            wb.add(fields.detect { |f| f.name.to_s == field_name }, filter_dump[:v], (filter_dump[:o] || 'default'))
             # AND current filter statements to other filter statements
             scope = wb.build
           end
@@ -142,11 +137,48 @@ module RailsAdmin
         StatementBuilder.new(column, type, value, operator).to_statement
       end
 
-      def type_lookup(property)
-        if model.serialized_attributes[property.name.to_s]
-          {:type => :serialized}
-        else
-          {:type => property.type}
+      class Property
+        attr_reader :property, :model
+
+        def initialize(property, model)
+          @property = property
+          @model = model
+        end
+
+        def name
+          property.name.to_sym
+        end
+
+        def pretty_name
+          property.name.to_s.tr('_', ' ').capitalize
+        end
+
+        def type
+          if model.serialized_attributes[property.name.to_s]
+            :serialized
+          else
+            property.type
+          end
+        end
+
+        def length
+          property.limit
+        end
+
+        def nullable?
+          property.null
+        end
+
+        def serial?
+          property.primary
+        end
+
+        def association?
+          false
+        end
+
+        def read_only?
+          false
         end
       end
 
@@ -158,72 +190,72 @@ module RailsAdmin
           @model = model
         end
 
-        def to_options_hash
-          {
-            :name => name.to_sym,
-            :pretty_name => display_name,
-            :type => macro,
-            :model_proc => Proc.new { model_lookup },
-            :primary_key_proc => Proc.new { primary_key_lookup },
-            :foreign_key => foreign_key.to_sym,
-            :foreign_type => foreign_type_lookup,
-            :as => as_lookup,
-            :polymorphic => polymorphic_lookup,
-            :inverse_of => inverse_of_lookup,
-            :read_only => read_only_lookup,
-            :nested_form => nested_attributes_options_lookup
-          }
+        def name
+          association.name.to_sym
         end
 
-        private
-        def model_lookup
-          if options[:polymorphic]
-            polymorphic_parents(:active_record, model_name.to_s, name) || []
-          else
-            klass
-          end
-        end
-
-        def foreign_type_lookup
-          options[:foreign_type].try(:to_sym) || :"#{name}_type" if options[:polymorphic]
-        end
-
-        def nested_attributes_options_lookup
-          model.nested_attributes_options.try { |o| o[name.to_sym] }
-        end
-
-        def as_lookup
-          options[:as].try :to_sym
-        end
-
-        def polymorphic_lookup
-          !!options[:polymorphic]
-        end
-
-        def primary_key_lookup
-          options[:primary_key] || klass.primary_key
-        end
-
-        def inverse_of_lookup
-          options[:inverse_of].try :to_sym
-        end
-
-        def read_only_lookup
-          klass.all.instance_eval(&scope).readonly_value if scope.is_a? Proc
-        end
-
-        def display_name
+        def pretty_name
           name.to_s.tr('_', ' ').capitalize
         end
 
-        delegate :klass, :macro, :name, :options, :scope, :foreign_key,
-                 :to => :association, :prefix => false
-        delegate :name, :to => :model, :prefix => true
-        delegate :polymorphic_parents, :to => RailsAdmin::AbstractModel
+        def type
+          association.macro
+        end
+
+        def klass
+          if options[:polymorphic]
+            polymorphic_parents(:active_record, model.name.to_s, name) || []
+          else
+            association.klass
+          end
+        end
+
+        def primary_key
+          (options[:primary_key] || association.klass.primary_key).try(:to_sym) unless polymorphic?
+        end
+
+        def foreign_key
+          association.foreign_key.to_sym
+        end
+
+        def foreign_type
+          options[:foreign_type].try(:to_sym) || :"#{name}_type" if options[:polymorphic]
+        end
+
+        def foreign_inverse_of
+          nil
+        end
+
+        def as
+          options[:as].try :to_sym
+        end
+
+        def polymorphic?
+          options[:polymorphic] || false
+        end
+
+        def inverse_of
+          options[:inverse_of].try :to_sym
+        end
+
+        def read_only?
+          (klass.all.instance_eval(&scope).readonly_value if scope.is_a? Proc) || false
+        end
+
+        def nested_options
+          model.nested_attributes_options.try { |o| o[name.to_sym] }
+        end
+
+        def association?
+          true
+        end
+
+        delegate :options, :scope, to: :association, prefix: false
+        delegate :polymorphic_parents, to: RailsAdmin::AbstractModel
       end
 
       class StatementBuilder < RailsAdmin::AbstractModel::StatementBuilder
-        protected
+      protected
 
         def unary_operators
           {
@@ -236,7 +268,7 @@ module RailsAdmin
           }
         end
 
-        private
+      private
 
         def range_filter(min, max)
           if min && max
@@ -250,11 +282,11 @@ module RailsAdmin
 
         def build_statement_for_type
           case @type
-            when :boolean                   then build_statement_for_boolean
-            when :integer, :decimal, :float then build_statement_for_integer_decimal_or_float
-            when :string, :text             then build_statement_for_string_or_text
-            when :enum                      then build_statement_for_enum
-            when :belongs_to_association    then build_statement_for_belongs_to_association
+          when :boolean                   then build_statement_for_boolean
+          when :integer, :decimal, :float then build_statement_for_integer_decimal_or_float
+          when :string, :text             then build_statement_for_string_or_text
+          when :enum                      then build_statement_for_enum
+          when :belongs_to_association    then build_statement_for_belongs_to_association
           end
         end
 
@@ -295,11 +327,11 @@ module RailsAdmin
         end
 
         def ar_adapter
-          Rails.configuration.database_configuration[Rails.env]['adapter']
+          ::ActiveRecord::Base.connection.adapter_name.downcase
         end
 
         def like_operator
-          ar_adapter == "postgresql" ? 'ILIKE' : 'LIKE'
+          ar_adapter == 'postgresql' ? 'ILIKE' : 'LIKE'
         end
       end
     end
